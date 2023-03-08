@@ -21,8 +21,10 @@
 #define		MOTOR_DRIVER_Y_PULSE_PIN						12
 #define		MOTOR_DRIVER_Y_DIRECTION_PIN					5
 
-#define		MOTOR_DRIVER_X_LIMIT_SWITCH_PIN					4
-#define		MOTOR_DRIVER_Y_LIMIT_SWITCH_PIN					2
+#define		MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN			4
+#define		MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN			2
+#define		MOTOR_DRIVER_X_END_LIMIT_SWITCH_PIN				16
+#define		MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN				15
 
 #define		MOTOR_DRIVER_X_SCREW_PITCH						4.0f	// mm
 #define		MOTOR_DRIVER_X_PULSE_PER_REVOLUTION				1000
@@ -50,19 +52,29 @@ int32_t					y_target_half_pulse_counter				= 0;
 
 bool					is_x_zero_detected						= false;
 bool					is_y_zero_detected						= false;
+bool					is_x_end_detected						= false;
+bool					is_y_end_detected						= false;
 
 
 void IRAM_ATTR onXTimer()
 {
 	if(x_current_half_pulse_counter < x_target_half_pulse_counter)
 	{
-		digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
-		digitalWrite(MOTOR_DRIVER_X_PULSE_PIN, !digitalRead(MOTOR_DRIVER_X_PULSE_PIN));
-		x_current_half_pulse_counter ++;
+		if(digitalRead(MOTOR_DRIVER_X_END_LIMIT_SWITCH_PIN) != 1)
+		{
+			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
+			digitalWrite(MOTOR_DRIVER_X_PULSE_PIN, !digitalRead(MOTOR_DRIVER_X_PULSE_PIN));
+			x_current_half_pulse_counter ++;
+		}
+		else
+		{
+			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
+			is_x_end_detected = true;
+		}
 	}
 	else if(x_current_half_pulse_counter > x_target_half_pulse_counter)
 	{
-		if(digitalRead(MOTOR_DRIVER_X_LIMIT_SWITCH_PIN) != 0)
+		if(digitalRead(MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN) != 1)
 		{
 			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
 			digitalWrite(MOTOR_DRIVER_X_PULSE_PIN, !digitalRead(MOTOR_DRIVER_X_PULSE_PIN));
@@ -85,13 +97,21 @@ void IRAM_ATTR onYTimer()
 
 	if(y_current_half_pulse_counter < y_target_half_pulse_counter)
 	{
-		digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
-		digitalWrite(MOTOR_DRIVER_Y_PULSE_PIN, !digitalRead(MOTOR_DRIVER_Y_PULSE_PIN));
-		y_current_half_pulse_counter ++;
+		if(digitalRead(MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN) != 1)
+		{
+			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
+			digitalWrite(MOTOR_DRIVER_Y_PULSE_PIN, !digitalRead(MOTOR_DRIVER_Y_PULSE_PIN));
+			y_current_half_pulse_counter ++;
+		}
+		else
+		{
+			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
+			is_y_end_detected = true;
+		}
 	}
 	else if(y_current_half_pulse_counter > y_target_half_pulse_counter)
 	{
-		if(digitalRead(MOTOR_DRIVER_Y_LIMIT_SWITCH_PIN) != 0)
+		if(digitalRead(MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN) != 1)
 		{
 			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
 			digitalWrite(MOTOR_DRIVER_Y_PULSE_PIN, !digitalRead(MOTOR_DRIVER_Y_PULSE_PIN));
@@ -123,8 +143,10 @@ void PulseGenerator::begin(){
 	pinMode(MOTOR_DRIVER_Y_PULSE_PIN, OUTPUT);
 	pinMode(MOTOR_DRIVER_Y_DIRECTION_PIN, OUTPUT);
 
-	pinMode(MOTOR_DRIVER_X_LIMIT_SWITCH_PIN, INPUT_PULLUP);
-	pinMode(MOTOR_DRIVER_Y_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+	pinMode(MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+	pinMode(MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+	pinMode(MOTOR_DRIVER_X_END_LIMIT_SWITCH_PIN, INPUT_PULLUP);
+	pinMode(MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN, INPUT_PULLUP);
 
 	digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
 	digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
@@ -154,7 +176,7 @@ TaskFunction_t PulseGenerator::TaskStart(void * pvParameters)
  */
 void PulseGenerator::MainTask()
 {
-	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 5.0f, 5.0f);
+	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 15.0f, 15.0f);
 
 	while(is_x_zero_detected == false || is_y_zero_detected == false)
 	{

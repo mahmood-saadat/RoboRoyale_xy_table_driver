@@ -85,7 +85,7 @@ void MotorDriver::MainTask() {
 					is_any_packet_received = true;
 
 				}
-				//				Serial.printf("[MotorDriver] X: %f, Y: %f, Speed: %f\n", x, y, speed, len);
+				//Serial.printf("[MotorDriver] X: %f, Y: %f, Speed: %f\n", x, y, x_speed);
 			}
 			else
 			{
