@@ -1,5 +1,5 @@
 /*
- * MotorDriver.h
+ * PulseGenerator.h
  *
  *  Created on: Nov 18, 2021
  *      Author: M.Saadat (m.saadat@mail.com)
@@ -10,8 +10,8 @@
  *  V1.0.0: Base release
  */
 
-#ifndef __MOTORDRIVER_H__
-#define __MOTORDRIVER_H__
+#ifndef __TASKS_MOTORDRIVER_H__
+#define __TASKS_MOTORDRIVER_H__
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -27,12 +27,24 @@ private:
 	//------------------------------ Private variables  -------------------------------------
 	TaskHandle_t 			mainTask;
 	uint32_t				stackWatermarkPrintLastMillis = 0;
+	bool					is_command_new = false;
+	uint32_t				x_pulse_frequency = 1000;
+	uint32_t				x_pulse_last_frequency_command = 1000;
+	uint32_t				y_pulse_frequency = 1000;
+	uint32_t				y_pulse_last_frequency_command = 1000;
+
+	bool					is_ready		= false;
 
 public:
 	//------------------------------ Public functions  -------------------------------------
 	MotorDriver();
 	void begin();
-
+	bool IsReady();
+	void SetX(float x);
+	void SetY(float y);
+	void SetXY(float x, float y);
+	void SetXY(float x, float y, float x_speed, float y_speed);
+	void GetXY(float * x, float * y);
 
 protected:
 
@@ -41,7 +53,8 @@ private:
 	static TaskFunction_t 	TaskStart(void * pvParameters);
 	void 					MainTask();
 	void					PrintStackWatermark();
-	float					ConvertToFloat(uint8_t* buffer);
+	void 					StartPulses();
+	void 					StopPulses();
 };
 
 extern MotorDriver motorDriver;

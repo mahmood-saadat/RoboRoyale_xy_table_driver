@@ -8,9 +8,9 @@
 #define _xy_table_driver_H_
 #include "Arduino.h"
 
-#include "Tasks/MotorDriver.h"
 #include "Functions/WifiManager.h"
-#include "Tasks/PulseGenerator.h"
+#include "Tasks/Commands.h"
+#include "Tasks/MotorDriver.h"
 
 
 //Do not add code below this line

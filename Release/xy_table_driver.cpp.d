@@ -129,8 +129,7 @@ xy_table_driver.cpp.o: ../xy_table_driver.cpp ../xy_table_driver.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/spi_flash/include/esp_spi_flash.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/spi_flash/include/esp_spi_flash_counters.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h \
- ../Tasks/MotorDriver.h ../Functions/WifiManager.h \
- ../Tasks/PulseGenerator.h
+ ../Functions/WifiManager.h ../Tasks/Commands.h ../Tasks/MotorDriver.h
 
 ../xy_table_driver.h:
 
@@ -394,8 +393,8 @@ xy_table_driver.cpp.o: ../xy_table_driver.cpp ../xy_table_driver.h \
 
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h:
 
-../Tasks/MotorDriver.h:
-
 ../Functions/WifiManager.h:
 
-../Tasks/PulseGenerator.h:
+../Tasks/Commands.h:
+
+../Tasks/MotorDriver.h:

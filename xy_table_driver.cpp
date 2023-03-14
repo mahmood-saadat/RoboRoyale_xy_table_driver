@@ -6,10 +6,10 @@
 void setup()
 {
 	Serial.begin(115200);
-	Serial.printf("Started!\r\n");
+	//Serial.printf("Started!\r\n");
 	WifiManager::WiFiOn();
+	commands.begin();
 	motorDriver.begin();
-	pulseGenerator.begin();
 }
 
 // The loop function is called in an endless loop
