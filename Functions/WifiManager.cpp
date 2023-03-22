@@ -41,7 +41,7 @@ void WifiManager::WiFiOn() {
 			//Serial.println(F("[WiFi] STA Failed to configure"));
 		}
 		WiFi.begin("SwaCIL", "FarshadArvin2022");
-		while (WiFi.status() != WL_CONNECTED){// && counter < 10) {
+		while (WiFi.status() != WL_CONNECTED && counter < 10) {
 			vTaskDelay(500);
 			//Serial.print(".");
 			counter ++;

@@ -192,7 +192,7 @@ Tasks/Commands.cpp.o: ../Tasks/Commands.cpp ../Tasks/Commands.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/Udp.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/cbuf.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/libraries/WiFi/src/WiFiUdp.h \
- ../Tasks/MotorDriver.h
+ ../Tasks/MotorDriver.h ../Tasks/../Functions/debug.h
 
 ../Tasks/Commands.h:
 
@@ -583,3 +583,5 @@ Tasks/Commands.cpp.o: ../Tasks/Commands.cpp ../Tasks/Commands.h \
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/libraries/WiFi/src/WiFiUdp.h:
 
 ../Tasks/MotorDriver.h:
+
+../Tasks/../Functions/debug.h:

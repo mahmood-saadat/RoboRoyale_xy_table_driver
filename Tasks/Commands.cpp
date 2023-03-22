@@ -15,9 +15,11 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "MotorDriver.h"
+#include "../Functions/debug.h"
 
 #define		WDT_TASK_TIMEOUT 	3000
 #define		WIFI_UDP_PORT		8745
+
 
 Commands 		commands;
 WiFiUDP 		wifiUDP;
@@ -117,6 +119,7 @@ void Commands::MainTask() {
 		// 1 byte checksum: sum of the X, Y and speed bytes (everything except the header)
 		while(Serial.available() >= 20)
 		{
+			DEBUG_printf("Serial bytes received: %d\r\n", Serial.available());
 			// Check if we have the header
 			if(Serial.read() == 0xFF)
 			{
@@ -124,6 +127,7 @@ void Commands::MainTask() {
 				{
 					if(Serial.read() == 0xFF)
 					{
+						DEBUG_printf("Serial command header detected.\r\n");
 						// Read the data bytes
 						Serial.read(receiveBuffer, 17);
 						if(receiveBuffer[16] == CalculateChecksum(receiveBuffer, 16))
@@ -150,6 +154,16 @@ void Commands::MainTask() {
 							buffer[11] = CalculateChecksum(&buffer[3], 8);
 							Serial.write(buffer, 12);
 						}
+						else
+						{
+							DEBUG_printf("Checksum failed; must be: %d is: %d\r\n", CalculateChecksum(receiveBuffer, 16), receiveBuffer[16]);
+							DEBUG_printf("Array: ");
+							for(uint16_t index = 0; index < 17; index ++)
+							{
+								DEBUG_printf("%02X ", receiveBuffer[index]);
+							}
+							DEBUG_printf("\r\n");
+						}
 					}
 				}
 			}
@@ -163,7 +177,8 @@ void Commands::MainTask() {
 void Commands::PrintStackWatermark(){
 	if(millis() > (stackWatermarkPrintLastMillis + 60000)){
 		stackWatermarkPrintLastMillis = millis();
-		Serial.printf("[Commands] Task Stack left: %d\r\n", uxTaskGetStackHighWaterMark(NULL));
+//		Serial.printf("[Commands] Task Stack left: %d\r\n", uxTaskGetStackHighWaterMark(NULL));
+		DEBUG_printf("[Commands] Task Stack left: %d\r\n", uxTaskGetStackHighWaterMark(NULL));
 	}
 }
 

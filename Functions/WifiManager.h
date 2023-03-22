@@ -14,6 +14,8 @@ public:
 	static void WiFiOn();
 	static void WiFiOff();
 	static bool IsConnected();
+
+	static void UdpDbgSend(String str);
 };
 
 
