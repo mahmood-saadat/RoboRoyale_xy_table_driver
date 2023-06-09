@@ -32,8 +32,8 @@
 #define		MOTOR_DRIVER_Y_SCREW_PITCH						4.0f	// mm
 #define		MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION				1000
 
-#define		MOTOR_DRIVER_X_COARSE							364.0f
-#define		MOTOR_DRIVER_Y_COARSE							500.0f
+#define		MOTOR_DRIVER_X_COARSE							580.0f//364.0f
+#define		MOTOR_DRIVER_Y_COARSE							610.0f//500.0f
 
 #define		ABS(x)  		(x<0)?-x:x
 
@@ -89,7 +89,7 @@ void IRAM_ATTR onXTimer()
 		else
 		{
 			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
-			x_current_half_pulse_counter = 0;
+			x_current_half_pulse_counter = -1500;//0;
 			x_target_half_pulse_counter = 0;
 			x_target_location = 0.0f;
 			is_x_zero_detected = true;
@@ -132,7 +132,7 @@ void IRAM_ATTR onYTimer()
 		else
 		{
 			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
-			y_current_half_pulse_counter = 0;
+			y_current_half_pulse_counter = -1500;//0;
 			y_target_half_pulse_counter = 0;
 			y_target_location = 0.0f;
 			is_y_zero_detected = true;
