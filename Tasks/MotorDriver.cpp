@@ -198,6 +198,7 @@ void MotorDriver::MainTask()
 	}
 
 	is_ready = true;
+	SetXY(MOTOR_DRIVER_X_COARSE, 0, 15.0f, 15.0f);
 
 	while(1){
 		esp_task_wdt_reset();
