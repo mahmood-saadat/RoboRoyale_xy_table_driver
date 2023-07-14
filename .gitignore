@@ -1,1 +1,4 @@
-./Release/**
+**/Release/**
+**.a
+**.o
+/Release/

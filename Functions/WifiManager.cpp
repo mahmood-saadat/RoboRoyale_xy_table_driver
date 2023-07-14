@@ -11,8 +11,9 @@
 #include "WifiManager.h"
 
 void WifiManager::WiFiOn() {
-	IPAddress ip(192, 168, 1, 200);
+	IPAddress ip(192, 168, 1, 1);
 	IPAddress gateway(192, 168, 1, 1);
+	IPAddress dhcpLeaseStart(192, 168, 1, 2);
 	IPAddress subnet(255, 255, 255, 0); // set subnet mask to match your
 	IPAddress dns(8,8,8,8);
 	IPAddress dns2(4,2,2,4);
@@ -21,43 +22,43 @@ void WifiManager::WiFiOn() {
 	int counter = 0;
 	//Serial.println(F("[WiFi] Connecting ... "));
 //	if(flash.GetWifiType() == WifiType::WifiType_AP){
-//		WiFi.mode(WIFI_AP);
-//		while(!WiFi.softAP("TALKTALKE8F602", "3AKMCHDM") && counter < 20){
-//			vTaskDelay(500);
-//			//Serial.print(":");
-//			counter ++;
-//		}
-//		vTaskDelay(2000);
-//		WiFi.softAPConfig(ip, gateway, subnet);
-//	}
-//	else{
-		if (!WiFi.mode(WIFI_STA))
-		{
-			//Serial.println(F("[WiFi] Failed to set STA mode"));
-		}
-
-		if (!WiFi.config(ip, gateway, subnet, dns))//, dns2))
-		{
-			//Serial.println(F("[WiFi] STA Failed to configure"));
-		}
-		WiFi.begin("SwaCIL", "FarshadArvin2022");
-		while (WiFi.status() != WL_CONNECTED && counter < 10) {
+		WiFi.mode(WIFI_AP);
+		while(!WiFi.softAP("ESP", "Day$88@88#") && counter < 10){
 			vTaskDelay(500);
-			//Serial.print(".");
+			//Serial.print(":");
 			counter ++;
 		}
+		//vTaskDelay(2000);
+		WiFi.softAPConfig(ip, gateway, subnet, dhcpLeaseStart);
 //	}
-	//Serial.print("\r\n");
-
-	// Print local IP address and start web server
-	if(WiFi.status() == WL_CONNECTED){
-		//Serial.println(F("WiFi connected."));
-		//Serial.println(F("IP address: "));
-		//Serial.println(WiFi.localIP().toString());
-	}
-	else{
-		//Serial.println(F("[WiFi] WiFi NOT connected."));
-	}
+//	else{
+//		if (!WiFi.mode(WIFI_STA))
+//		{
+//			//Serial.println(F("[WiFi] Failed to set STA mode"));
+//		}
+//
+//		if (!WiFi.config(ip, gateway, subnet, dns))//, dns2))
+//		{
+//			//Serial.println(F("[WiFi] STA Failed to configure"));
+//		}
+//		WiFi.begin("SwaCIL", "FarshadArvin2022");
+////		while (WiFi.status() != WL_CONNECTED && counter < 10) {
+////			vTaskDelay(500);
+////			//Serial.print(".");
+////			counter ++;
+////		}
+////	}
+//	//Serial.print("\r\n");
+//
+//	// Print local IP address and start web server
+//	if(WiFi.status() == WL_CONNECTED){
+//		//Serial.println(F("WiFi connected."));
+//		//Serial.println(F("IP address: "));
+//		//Serial.println(WiFi.localIP().toString());
+//	}
+//	else{
+//		//Serial.println(F("[WiFi] WiFi NOT connected."));
+//	}
 
 }
 

@@ -188,7 +188,7 @@ TaskFunction_t MotorDriver::TaskStart(void * pvParameters)
  */
 void MotorDriver::MainTask()
 {
-	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 15.0f, 15.0f);
+	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 10.0f, 10.0f);
 
 	while(is_x_zero_detected == false || is_y_zero_detected == false)
 	{
@@ -198,7 +198,7 @@ void MotorDriver::MainTask()
 	}
 
 	is_ready = true;
-	SetXY(MOTOR_DRIVER_X_COARSE, 0, 15.0f, 15.0f);
+	SetXY(MOTOR_DRIVER_X_COARSE, 0, 5.0f, 5.0f);
 
 	while(1){
 		esp_task_wdt_reset();
@@ -403,5 +403,11 @@ void MotorDriver::GetXY(float * x, float * y)
 {
 	*x = x_current_half_pulse_counter * MOTOR_DRIVER_X_SCREW_PITCH / 2 / MOTOR_DRIVER_X_PULSE_PER_REVOLUTION;
 	*y = y_current_half_pulse_counter * MOTOR_DRIVER_Y_SCREW_PITCH / 2 / MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION;
+}
+
+void MotorDriver::SetXYCurrentPosition(float x, float y)
+{
+	x_current_half_pulse_counter = x * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
+	y_current_half_pulse_counter = y * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
 }
 

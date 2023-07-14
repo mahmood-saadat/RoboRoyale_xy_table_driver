@@ -43,6 +43,7 @@ private:
 	void					PrintStackWatermark();
 	float					ConvertToFloat(uint8_t* buffer);
 	uint8_t 				CalculateChecksum(uint8_t * buffer, uint16_t len);
+	void 					SendBackCurrentPosition();
 };
 
 extern Commands commands;

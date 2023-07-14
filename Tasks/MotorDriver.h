@@ -45,6 +45,7 @@ public:
 	void SetXY(float x, float y);
 	void SetXY(float x, float y, float x_speed, float y_speed);
 	void GetXY(float * x, float * y);
+	void SetXYCurrentPosition(float x, float y);
 
 protected:
 
