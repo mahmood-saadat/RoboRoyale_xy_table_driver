@@ -10,12 +10,16 @@
 
 #include "MotorDriver.h"
 
+#include "../Functions/debug.h"
+
 #include <esp_task_wdt.h>
 #include <Arduino.h>
 
+#define		MOTOR_DRIVER_LOOP_DT_MS							10
 #define 	MOTOR_DRIVER_WDT_PULSE_GENERATOR_TASK_TIMEOUT 	5000
 #define		MOTOR_DRIVER_PULSE_GENERATOR_DEAD_BAND			1
 #define		MOTOR_DRIVER_ESP_FREQUENCY						80000000
+#define		MOTOR_DRIVER_TIMER_DIVIDER						2
 
 #define		MOTOR_DRIVER_X_PULSE_PIN						14
 #define		MOTOR_DRIVER_X_DIRECTION_PIN					13
@@ -33,9 +37,29 @@
 #define		MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION				1000
 
 #define		MOTOR_DRIVER_X_COARSE							580.0f//364.0f
-#define		MOTOR_DRIVER_Y_COARSE							610.0f//500.0f
+#define		MOTOR_DRIVER_Y_COARSE							150//610.0f//500.0f
+
+#define		MOTOR_DRIVER_X_DEFAULT_ACCELERAYION				10.0f// mm/s^2
+#define		MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION				10.0f// mm/s^2
+
+#define		MOTOR_DRIVER_X_MIN_SPEED						0.01f// mm/s
+#define		MOTOR_DRIVER_Y_MIN_SPEED						0.01f// mm/s
+#define		MOTOR_DRIVER_X_MAX_SPEED						40.0f// mm/s
+#define		MOTOR_DRIVER_Y_MAX_SPEED						40.0f// mm/s
+
+#define		MOTOR_DRIVER_X_ERR_MAX							1000.0f
+#define		MOTOR_DRIVER_Y_ERR_MAX							1000.0f
+
+#define		MOTOR_DRIVER_LOCATION_DEADBAND					0.01
+
+
+// PID Controller Constants
+#define 	KP 												0.001 		// Proportional Gain
+#define 	KI 												0.0001 		// Integral Gain
+#define 	KD 												0.00001 		// Derivative Gain
 
 #define		ABS(x)  		(x<0)?-x:x
+#define		SIGN(x)			((x>=0)?(int)1:(int)-1)
 
 
 MotorDriver 			motorDriver;
@@ -43,8 +67,11 @@ MotorDriver 			motorDriver;
 hw_timer_t * x_pulse_generator_timer = NULL;
 hw_timer_t * y_pulse_generator_timer = NULL;
 
-float					x_target_location 			= 0.0f;
-float					y_target_location 			= 0.0f;
+// These are used in isr. We can not use the class members unless we make it public or make static setter and getters
+float					x_command_location 			= 0.0f;
+float					y_command_location 			= 0.0f;
+bool					is_x_speed_positive = true;
+bool					is_y_speed_positive = true;
 
 int32_t					x_current_half_pulse_counter			= 0;
 int32_t					y_current_half_pulse_counter			= 0;
@@ -64,7 +91,9 @@ bool					is_y_end_detected						= false;
  */
 void IRAM_ATTR onXTimer()
 {
-	if(x_current_half_pulse_counter < x_target_half_pulse_counter)
+	//if(x_current_half_pulse_counter < x_target_half_pulse_counter)
+	if(is_x_speed_positive && ((x_current_half_pulse_counter != x_target_half_pulse_counter) ||
+			(motorDriver.GetXState() != MotorDriver::IDLE)))
 	{
 		if(digitalRead(MOTOR_DRIVER_X_END_LIMIT_SWITCH_PIN) != 1)
 		{
@@ -78,7 +107,9 @@ void IRAM_ATTR onXTimer()
 			is_x_end_detected = true;
 		}
 	}
-	else if(x_current_half_pulse_counter > x_target_half_pulse_counter)
+	//else if(x_current_half_pulse_counter > x_target_half_pulse_counter)
+	else if(!is_x_speed_positive && ((x_current_half_pulse_counter != x_target_half_pulse_counter) ||
+			(motorDriver.GetXState() != MotorDriver::IDLE)))
 	{
 		if(digitalRead(MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN) != 1)
 		{
@@ -88,12 +119,20 @@ void IRAM_ATTR onXTimer()
 		}
 		else
 		{
-			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
-			x_current_half_pulse_counter = -1500;//0;
-			x_target_half_pulse_counter = 0;
-			x_target_location = 0.0f;
-			is_x_zero_detected = true;
+//			digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
+//			x_current_half_pulse_counter = -1500;//0;
+//			x_target_half_pulse_counter = 0;
+//			x_command_location = 0.0f;
+//			is_x_zero_detected = true;
 		}
+	}
+	if(digitalRead(MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN) == 1)
+	{
+		digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
+		x_current_half_pulse_counter = -1500;//0;
+		x_target_half_pulse_counter = 0;
+		x_command_location = 0.0f;
+		is_x_zero_detected = true;
 	}
 
 }
@@ -107,7 +146,9 @@ void IRAM_ATTR onXTimer()
 void IRAM_ATTR onYTimer()
 {
 
-	if(y_current_half_pulse_counter < y_target_half_pulse_counter)
+	//if(y_current_half_pulse_counter < y_target_half_pulse_counter)
+	if(is_y_speed_positive && ((y_current_half_pulse_counter != y_target_half_pulse_counter) ||
+			(motorDriver.GetYState() != MotorDriver::IDLE)))
 	{
 		if(digitalRead(MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN) != 1)
 		{
@@ -121,7 +162,9 @@ void IRAM_ATTR onYTimer()
 			is_y_end_detected = true;
 		}
 	}
-	else if(y_current_half_pulse_counter > y_target_half_pulse_counter)
+	//else if(y_current_half_pulse_counter > y_target_half_pulse_counter)
+	else if(!is_y_speed_positive && ((y_current_half_pulse_counter != y_target_half_pulse_counter) ||
+			(motorDriver.GetYState() != MotorDriver::IDLE)))
 	{
 		if(digitalRead(MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN) != 1)
 		{
@@ -131,12 +174,20 @@ void IRAM_ATTR onYTimer()
 		}
 		else
 		{
-			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
-			y_current_half_pulse_counter = -1500;//0;
-			y_target_half_pulse_counter = 0;
-			y_target_location = 0.0f;
-			is_y_zero_detected = true;
+//			digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
+//			y_current_half_pulse_counter = -1500;//0;
+//			y_target_half_pulse_counter = 0;
+//			y_command_location = 0.0f;
+//			is_y_zero_detected = true;
 		}
+	}
+	if(digitalRead(MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN) == 1)
+	{
+		digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
+		y_current_half_pulse_counter = -1500;//0;
+		y_target_half_pulse_counter = 0;
+		y_command_location = 0.0f;
+		is_y_zero_detected = true;
 	}
 }
 
@@ -163,6 +214,8 @@ void MotorDriver::begin(){
 	digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
 	digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
 
+	TimerInit();
+
 	xTaskCreate((TaskFunction_t)MotorDriver::TaskStart, "MotorDriverTask", 8192, this, 50, &mainTask);
 
 	//Serial.println("[MotorDriver] Setup is done.");
@@ -188,13 +241,15 @@ TaskFunction_t MotorDriver::TaskStart(void * pvParameters)
  */
 void MotorDriver::MainTask()
 {
+	uint32_t counter = 0;
 	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 10.0f, 10.0f);
 
 	while(is_x_zero_detected == false || is_y_zero_detected == false)
 	{
+		UpdatePulseFrequency();
 		//Serial.printf("[MotorDriver] Waiting for zero!\r\n");
 		esp_task_wdt_reset();
-		vTaskDelay(1000/portTICK_PERIOD_MS);
+		vTaskDelay(MOTOR_DRIVER_LOOP_DT_MS/portTICK_PERIOD_MS);
 	}
 
 	is_ready = true;
@@ -203,10 +258,32 @@ void MotorDriver::MainTask()
 	while(1){
 		esp_task_wdt_reset();
 
+		if(counter>2000)
+		{
+			SetXY(0.0f, 0.0f, 20.0f, 20.0f);
+		}
+		else if(counter>1700)
+		{
+			SetXY(150, 150, 20.0f, 20.0f);
+		}
+		else if(counter>1000)
+		{
+			SetXY(10, 10, 5.0f, 5.0f);
+		}
+		else if(counter>50)
+		{
+			SetXY(100, 100, 25.0f, 25.0f);
+		}
+		counter ++;
+		if(counter > 2300)
+		{
+			counter = 0;
+		}
 
+		UpdatePulseFrequency();
 //		//Serial.printf("[MotorDriver] Current: %d, Target: %d\r\n", x_current_half_pulse_counter, x_target_half_pulse_counter);
 		PrintStackWatermark();
-		vTaskDelay(10/portTICK_PERIOD_MS);
+		vTaskDelay(MOTOR_DRIVER_LOOP_DT_MS/portTICK_PERIOD_MS);
 	}
 }
 
@@ -220,134 +297,634 @@ void MotorDriver::PrintStackWatermark()
 	}
 }
 
+/**
+ * This method should be called periodically to update the speed
+ */
+void MotorDriver::UpdatePulseFrequency()
+{
+
+#if 0
+//	float x_next_speed = 0.0f;// = CalculateSpeed(x_current_speed, x_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//	float y_next_speed = 0.0f;// = CalculateSpeed(y_current_speed, y_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//
+	float x_rem = 0.0f;// = 0.5f*(x_current_speed - x_target_speed)*(x_current_speed - x_target_speed)/x_target_acceleration;
+	float y_rem = 0.0f;// = 0.5f*(y_current_speed - y_target_speed)*(y_current_speed - y_target_speed)/y_target_acceleration;
+
+	int8_t x_accel_sign = 1;
+	int8_t y_accel_sign = 1;
+
+	float x_cur = 0.0f;
+	float y_cur = 0.0f;
+	GetXY(&x_cur, &y_cur);
+
+
+
+	if(abs(x_current_speed) < (x_command_speed) && abs(x_command_speed) > MOTOR_DRIVER_X_MIN_SPEED)
+	{
+		x_rem = 0.95f*0.5f*(abs(x_current_speed) - x_command_speed)*(abs(x_current_speed) - x_command_speed)/x_command_acceleration;
+	}
+	else if(abs(x_command_speed) > MOTOR_DRIVER_X_MIN_SPEED)
+	{
+		x_rem = 0.95f*0.5f*(x_current_speed)*(x_current_speed)/x_command_acceleration;
+	}
+	if(abs(y_current_speed) < (y_command_speed) && abs(y_command_speed) > MOTOR_DRIVER_Y_MIN_SPEED && y_motor_state == ACCELERATION)
+	{
+		y_rem = 0.95f*0.5f*(abs(y_current_speed) - y_command_speed)*(abs(y_current_speed) - y_command_speed)/y_command_acceleration;
+	}
+	else if(abs(y_command_speed) > MOTOR_DRIVER_Y_MIN_SPEED && y_motor_state != ACCELERATION)
+	{
+		y_rem = 0.95f*0.5f*(y_current_speed)*(y_current_speed)/y_command_acceleration;
+	}
+//
+//	if(abs(x_target_location - x_cur) > x_rem)
+//	{
+//		x_next_speed = CalculateSpeed(x_current_speed, x_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//		if(x_current_speed < x_target_speed)
+//		{
+//			x_current_speed = x_next_speed;
+//		}
+//	}
+//	else
+//	{
+//		x_next_speed = CalculateSpeed(x_current_speed, -1.0f * x_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//		if(x_next_speed > MOTOR_DRIVER_X_MIN_SPEED)
+//		{
+//			x_current_speed = x_next_speed;
+//		}
+//	}
+//
+//	if(abs(y_target_location - y_cur) > y_rem)
+//	{
+//		y_next_speed = CalculateSpeed(y_current_speed, y_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//		if(y_current_speed < y_target_speed)
+//		{
+//			y_current_speed = y_next_speed;
+//		}
+//	}
+//	else
+//	{
+//		y_next_speed = CalculateSpeed(y_current_speed, -1.0f * y_target_acceleration, MOTOR_DRIVER_LOOP_DT_MS);
+//		if(y_next_speed > MOTOR_DRIVER_Y_MIN_SPEED)
+//		{
+//			y_current_speed = y_next_speed;
+//		}
+//	}
+//
+//	DEBUG_printf("y-rem: %f, y-speed: %f\n", y_rem, y_current_speed);
+
+	if(abs(x_command_location - x_cur) > x_rem)
+	{
+		x_accel_sign = 1;
+		x_motor_state = ACCELERATION;
+	}
+	else
+	{
+		x_accel_sign = -1;
+		if(x_motor_state == CONSTANT_SPEED)
+		{
+			x_motor_state = DECELERATION;
+			x_command_speed = 0.0f;
+		}
+	}
+
+	if(abs(y_command_location - y_cur) > y_rem)
+	{
+		y_accel_sign = 1;
+		y_motor_state = ACCELERATION;
+	}
+	else
+	{
+		y_accel_sign = -1;
+		if(y_motor_state == CONSTANT_SPEED)
+		{
+			x_motor_state = DECELERATION;
+			x_command_speed = 0.0f;
+		}
+	}
+
+
+	DEBUG_printf("[Y] sp: %f, com: %f, loc; cur: %f, com: %f, rem: %f, sign: %d, accel com: %f\n",
+			y_current_speed, y_command_speed, y_cur, y_command_location, y_rem, y_accel_sign, y_command_acceleration);
+
+
+//	CalculateSpeed(x_command_location, x_cur, x_integral, x_previos_err, x_current_speed, x_command_acceleration);
+//	CalculateSpeed(y_command_location, y_cur, y_integral, y_previos_err, y_current_speed, y_command_acceleration);
+//
+	if(x_cur < x_command_location)
+	{
+		x_current_speed = ((x_accel_sign*x_current_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+	}
+	else
+	{
+		x_current_speed = ((x_accel_sign*-1*x_current_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+	}
+	if(y_cur < y_command_location)
+	{
+		y_current_speed = ((y_accel_sign*y_current_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+	}
+	else
+	{
+		y_current_speed = ((y_accel_sign*-1*y_current_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+	}
+
+
+	if(x_current_speed >= 0.0f)
+	{
+		if(x_current_speed < MOTOR_DRIVER_X_MIN_SPEED)
+		{
+			x_current_speed = MOTOR_DRIVER_X_MIN_SPEED;
+		}
+		else if(x_accel_sign > 0 && abs(x_current_speed) > abs(x_command_speed))
+		{
+			x_current_speed = x_command_speed;
+			x_motor_state = CONSTANT_SPEED;
+		}
+		else if(abs(x_current_speed) > abs(x_command_speed))
+		{
+			x_current_speed = x_command_speed;
+		}
+		is_x_speed_positive = true;
+	}
+	else
+	{
+		if(x_current_speed > (-1*MOTOR_DRIVER_X_MIN_SPEED))
+		{
+			x_current_speed = (-1*MOTOR_DRIVER_X_MIN_SPEED);
+		}
+		else if(x_accel_sign > 0 && abs(x_current_speed) > abs(x_command_speed))
+		{
+			x_current_speed = x_command_speed;
+			x_motor_state = CONSTANT_SPEED;
+		}
+		else if(abs(x_current_speed) > abs(x_command_speed))
+		{
+			x_current_speed = x_command_speed;
+		}
+		is_x_speed_positive = false;
+	}
+	if(abs(x_cur - x_command_location) <= MOTOR_DRIVER_LOCATION_DEADBAND)
+	{
+		x_command_speed = 0.0f;
+		if(abs(x_current_speed) < (10.0f*MOTOR_DRIVER_X_MIN_SPEED))
+		{
+			x_current_acceleration = 0.0f;
+		}
+	}
+	else
+	{
+		x_current_acceleration = x_command_acceleration;
+	}
+
+	if(y_current_speed >= 0.0f)
+	{
+		if(y_current_speed < MOTOR_DRIVER_Y_MIN_SPEED)
+		{
+			y_current_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+		}
+		else if(y_accel_sign > 0 && abs(y_current_speed) > abs(y_command_speed))
+		{
+			y_current_speed = y_command_speed;
+			y_motor_state = CONSTANT_SPEED;
+		}
+		else if(abs(y_current_speed) > abs(y_command_speed))
+		{
+			y_current_speed = y_command_speed;
+		}
+		is_y_speed_positive = true;
+	}
+	else
+	{
+		if(y_current_speed > (-1*MOTOR_DRIVER_Y_MIN_SPEED))
+		{
+			y_current_speed = (-1*MOTOR_DRIVER_Y_MIN_SPEED);
+		}
+		else if(y_accel_sign > 0 && y_current_speed < (-1*y_command_speed))
+		{
+			y_current_speed = -1*y_command_speed;
+			y_motor_state = CONSTANT_SPEED;
+		}
+		is_y_speed_positive = false;
+	}
+
+	if(abs(y_cur - y_command_location) <= MOTOR_DRIVER_LOCATION_DEADBAND)
+	{
+		y_command_speed = 0.0f;
+		if(abs(y_current_speed) < (10.0f*MOTOR_DRIVER_Y_MIN_SPEED))
+		{
+			y_current_acceleration = 0.0f;
+		}
+	}
+	else
+	{
+		y_current_acceleration = y_command_acceleration;
+	}
+
+
+//	if(x_previos_err > MOTOR_DRIVER_X_ERR_MAX)
+//	{
+//		x_previos_err = MOTOR_DRIVER_X_ERR_MAX;
+//	}
+//	else if(x_previos_err < (-1*MOTOR_DRIVER_X_ERR_MAX))
+//	{
+//		x_previos_err = -1*MOTOR_DRIVER_X_ERR_MAX;
+//	}
+//	if(y_previos_err > MOTOR_DRIVER_Y_ERR_MAX)
+//	{
+//		y_previos_err = MOTOR_DRIVER_Y_ERR_MAX;
+//	}
+//	else if(y_previos_err < (-1*MOTOR_DRIVER_Y_ERR_MAX))
+//	{
+//		y_previos_err = -1*MOTOR_DRIVER_Y_ERR_MAX;
+//	}
+//
+//	if(x_integral > MOTOR_DRIVER_X_ERR_MAX)
+//	{
+//		x_integral = MOTOR_DRIVER_X_ERR_MAX;
+//	}
+//	else if(x_integral < (-1*MOTOR_DRIVER_X_ERR_MAX))
+//	{
+//		x_integral = -1*MOTOR_DRIVER_X_ERR_MAX;
+//	}
+//	if(y_integral > MOTOR_DRIVER_X_ERR_MAX)
+//	{
+//		y_integral = MOTOR_DRIVER_X_ERR_MAX;
+//	}
+//	else if(y_integral < (-1*MOTOR_DRIVER_X_ERR_MAX))
+//	{
+//		y_integral = -1*MOTOR_DRIVER_X_ERR_MAX;
+//	}
+
+
+	StartPulses(x_current_speed, y_current_speed);
+#endif
+
+	int8_t x_accel_sign = 1;
+	int8_t y_accel_sign = 1;
+
+	float x_cur = 0.0f;
+	float y_cur = 0.0f;
+	GetXY(&x_cur, &y_cur);
+
+	UpdateXState();
+	UpdateYState();
+
+	switch(x_motor_state)
+	{
+	case MOTOR_STATE::IDLE:
+
+		break;
+
+	case MOTOR_STATE::ACCELERATION:
+	case MOTOR_STATE::DECELERATION:
+		if(x_current_speed < x_target_speed)
+		{
+			x_current_speed = ((x_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+		}
+		else
+		{
+			x_current_speed = ((-1*x_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+		}
+		break;
+	case MOTOR_STATE::CONSTANT_SPEED:
+
+		break;
+
+	default:
+		break;
+	}
+	if(x_current_speed >= 0.0f)
+	{
+		is_x_speed_positive = true;
+	}
+	else
+	{
+		is_x_speed_positive = false;
+	}
+
+
+	switch(y_motor_state)
+	{
+	case MOTOR_STATE::IDLE:
+
+		break;
+
+	case MOTOR_STATE::ACCELERATION:
+	case MOTOR_STATE::DECELERATION:
+		if(y_current_speed < y_target_speed)
+		{
+			y_current_speed = ((y_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+		}
+		else
+		{
+			y_current_speed = ((-1*y_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+		}
+		break;
+	case MOTOR_STATE::CONSTANT_SPEED:
+
+		break;
+
+	default:
+		break;
+	}
+	if(y_current_speed >= 0.0f)
+	{
+		is_y_speed_positive = true;
+	}
+	else
+	{
+		is_y_speed_positive = false;
+	}
+
+
+	StartPulses(x_current_speed, y_current_speed);
+
+	float y_rem = GetYrem();
+	DEBUG_printf("[Y] speed: %f, com: %f, tar: %f, loc; cur: %f, com: %f, rem: %f, mode: %d\n",
+			y_current_speed, y_command_speed, y_target_speed, y_cur, y_command_location, y_rem, y_motor_state);
+}
+
+void MotorDriver::UpdateXState(void)
+{
+	// Needed to add a little margin so it wouldn't switch between modes and make a smooth stop
+	float x_rem = 1.3f*GetXrem();
+	float x_cur = 0.0f;
+	float y_cur = 0.0f;
+	GetXY(&x_cur, &y_cur);
+	float x_diff = abs(x_cur - x_command_location);
+
+	switch(x_motor_state)
+	{
+	case MOTOR_STATE::IDLE:
+		if(x_diff > MOTOR_DRIVER_LOCATION_DEADBAND)
+		{
+			if(x_command_location > x_cur)
+			{
+				x_target_speed = x_command_speed;
+			}
+			else
+			{
+				x_target_speed = -1*x_command_speed;
+			}
+			x_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		break;
+
+	case MOTOR_STATE::ACCELERATION:
+		if((SIGN(x_current_speed) == SIGN(x_target_speed)) && (abs(x_current_speed) >= abs(x_target_speed)))
+		{
+			x_motor_state = MOTOR_STATE::CONSTANT_SPEED;
+		}
+		if(abs(x_cur - x_command_location) < x_rem)
+		{
+			x_target_speed = MOTOR_DRIVER_X_MIN_SPEED;
+			x_motor_state = MOTOR_STATE::DECELERATION;
+		}
+		else
+		{
+			if(x_cur < x_command_location)
+			{
+				x_target_speed = x_command_speed;
+			}
+			else
+			{
+				x_target_speed = -1*x_command_speed;
+			}
+		}
+		break;
+	case MOTOR_STATE::DECELERATION:
+		if(abs(x_current_speed) <= MOTOR_DRIVER_X_MIN_SPEED)
+		{
+			x_motor_state = MOTOR_STATE::IDLE;
+		}
+		if(abs(x_cur - x_command_location) > x_rem)
+		{
+			if(x_cur < x_command_location)
+			{
+				x_target_speed = x_command_speed;
+			}
+			else
+			{
+				x_target_speed = -1*x_command_speed;
+			}
+			x_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		break;
+	case MOTOR_STATE::CONSTANT_SPEED:
+
+		if(abs(x_cur - x_command_location) < x_rem)
+		{
+			x_target_speed = MOTOR_DRIVER_X_MIN_SPEED;
+			x_motor_state = MOTOR_STATE::DECELERATION;
+		}
+		else if(
+				((SIGN(x_current_speed) == SIGN(x_target_speed)) && (abs(x_current_speed) < abs(x_target_speed))) ||
+				(SIGN(x_current_speed) != SIGN(x_target_speed))
+		)
+		{
+			x_target_speed = SIGN(x_current_speed)*x_command_speed;
+			x_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		if(x_motor_state != MOTOR_STATE::DECELERATION)
+		{
+			if(x_cur < x_command_location)
+			{
+				x_target_speed = x_command_speed;
+			}
+			else
+			{
+				x_target_speed = -1*x_command_speed;
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+void MotorDriver::UpdateYState(void)
+{
+	// Needed to add a little margin so it wouldn't switch between modes and make a smooth stop
+	float y_rem = 1.3f*GetYrem();
+	float x_cur = 0.0f;
+	float y_cur = 0.0f;
+	GetXY(&x_cur, &y_cur);
+	float y_diff = abs(y_cur - y_command_location);
+
+	switch(y_motor_state)
+	{
+	case MOTOR_STATE::IDLE:
+		if(y_diff > MOTOR_DRIVER_LOCATION_DEADBAND)
+		{
+			if(y_command_location > y_cur)
+			{
+				y_target_speed = y_command_speed;
+			}
+			else
+			{
+				y_target_speed = -1*y_command_speed;
+			}
+			y_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		break;
+
+	case MOTOR_STATE::ACCELERATION:
+		if((SIGN(y_current_speed) == SIGN(y_target_speed)) && (abs(y_current_speed) >= abs(y_target_speed)))
+		{
+			DEBUG_printf("[2] speed: %d, tar: %d\n",
+						SIGN(y_current_speed), SIGN(y_target_speed));
+			y_motor_state = MOTOR_STATE::CONSTANT_SPEED;
+		}
+		if(abs(y_cur - y_command_location) < y_rem)
+		{
+			y_target_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+			y_motor_state = MOTOR_STATE::DECELERATION;
+		}
+		else
+		{
+			if(y_cur < y_command_location)
+			{
+				y_target_speed = y_command_speed;
+			}
+			else
+			{
+				y_target_speed = -1*y_command_speed;
+			}
+		}
+		break;
+	case MOTOR_STATE::DECELERATION:
+		if(abs(y_current_speed) <= MOTOR_DRIVER_Y_MIN_SPEED)
+		{
+			y_motor_state = MOTOR_STATE::IDLE;
+		}
+		if(abs(y_cur - y_command_location) > y_rem)
+		{
+			if(y_cur < y_command_location)
+			{
+				y_target_speed = y_command_speed;
+			}
+			else
+			{
+				y_target_speed = -1*y_command_speed;
+			}
+			y_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		break;
+	case MOTOR_STATE::CONSTANT_SPEED:
+
+		if(abs(y_cur - y_command_location) < y_rem)
+		{
+			y_target_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+			y_motor_state = MOTOR_STATE::DECELERATION;
+		}
+		else if(
+				((SIGN(y_current_speed) == SIGN(y_target_speed)) && (abs(y_current_speed) < abs(y_target_speed))) ||
+				(SIGN(y_current_speed) != SIGN(y_target_speed))
+				)
+		{
+			y_target_speed = SIGN(y_current_speed)*y_command_speed;
+			y_motor_state = MOTOR_STATE::ACCELERATION;
+		}
+		if(y_motor_state != MOTOR_STATE::DECELERATION)
+		{
+			if(y_cur < y_command_location)
+			{
+				y_target_speed = y_command_speed;
+			}
+			else
+			{
+				y_target_speed = -1*y_command_speed;
+			}
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+float MotorDriver::GetXrem()
+{
+//	return 0.5f*(x_current_speed - x_target_speed)*(x_current_speed - x_target_speed)/x_command_acceleration;
+	return 0.5f*(x_current_speed)*(x_current_speed)/x_command_acceleration;
+}
+
+float MotorDriver::GetYrem()
+{
+//	return 0.5f*(y_current_speed - y_target_speed)*(y_current_speed - y_target_speed)/y_command_acceleration;
+	return 0.5f*(y_current_speed)*(y_current_speed)/y_command_acceleration;
+}
+
+
 bool MotorDriver::IsReady()
 {
 	return is_ready;
 }
 
-void MotorDriver::StartPulses()
+void MotorDriver::TimerInit()
 {
-	uint32_t prescaler = 0;
-	StopPulses();
-
-	prescaler = MOTOR_DRIVER_ESP_FREQUENCY/8000/x_pulse_frequency/2;
-	//Serial.printf("[MotorDriver] Setting the X timer; prescaler: %d\r\n", prescaler);
-	x_pulse_generator_timer = timerBegin(0, 8000, true);
+	x_pulse_generator_timer = timerBegin(0, MOTOR_DRIVER_TIMER_DIVIDER, true);
 	timerAttachInterrupt(x_pulse_generator_timer, &onXTimer, true);
 	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
-	timerAlarmWrite(x_pulse_generator_timer, prescaler, true);
+	timerAlarmWrite(x_pulse_generator_timer, 40000000, true);
 	/* Start an alarm */
 	timerAlarmEnable(x_pulse_generator_timer);
 
-	prescaler = MOTOR_DRIVER_ESP_FREQUENCY/8000/y_pulse_frequency/2;
-	//Serial.printf("[MotorDriver] Setting the Y timer; prescaler: %d\r\n", prescaler);
-	y_pulse_generator_timer = timerBegin(1, 8000, true);
+	y_pulse_generator_timer = timerBegin(1, MOTOR_DRIVER_TIMER_DIVIDER, true);
 	timerAttachInterrupt(y_pulse_generator_timer, &onYTimer, true);
 	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
-	timerAlarmWrite(y_pulse_generator_timer, prescaler, true);
+	timerAlarmWrite(y_pulse_generator_timer, 40000000, true);
 	/* Start an alarm */
 	timerAlarmEnable(y_pulse_generator_timer);
 }
 
+bool is_first_time = true;
+void MotorDriver::StartPulses(uint32_t x_pulse_frequency, uint32_t y_pulse_frequency)
+{
+	uint32_t x_prescaler = 0;
+	uint32_t y_prescaler = 0;
+	StopPulses();
+
+	if(x_pulse_frequency == 0)
+	{
+		x_pulse_frequency = 10;
+	}
+	if(y_pulse_frequency == 0)
+	{
+		y_pulse_frequency = 10;
+	}
+
+	x_prescaler = MOTOR_DRIVER_ESP_FREQUENCY/MOTOR_DRIVER_TIMER_DIVIDER/x_pulse_frequency/2;
+	if(0 == x_prescaler)
+	{
+		x_prescaler = 1;
+	}
+	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
+	timerAlarmWrite(x_pulse_generator_timer, x_prescaler, true);
+
+	y_prescaler = MOTOR_DRIVER_ESP_FREQUENCY/MOTOR_DRIVER_TIMER_DIVIDER/y_pulse_frequency/2;
+	if(0 == y_prescaler)
+	{
+		y_prescaler = 1;
+	}
+	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
+	timerAlarmWrite(y_pulse_generator_timer, y_prescaler, true);
+
+}
+
+void MotorDriver::StartPulses(float x_speed, float y_speed)
+{
+	StartPulses(XSpeedToFrequency(x_speed), YSpeedToFrequency(y_speed));
+}
+
 void MotorDriver::StopPulses()
 {
-	if(x_pulse_generator_timer != NULL)
-	{
-		/* Repeat the alarm (third parameter) */
-		timerAlarmWrite(x_pulse_generator_timer, 1, false);
-		/* Start an alarm */
-		timerAlarmDisable(x_pulse_generator_timer);
-		timerStop(x_pulse_generator_timer);
-		timerDetachInterrupt(x_pulse_generator_timer);
-		timerEnd(x_pulse_generator_timer);
-	}
-	if(y_pulse_generator_timer != NULL)
-	{
-		/* Repeat the alarm (third parameter) */
-		timerAlarmWrite(y_pulse_generator_timer, 1, false);
-		/* Start an alarm */
-		timerAlarmDisable(y_pulse_generator_timer);
-		timerStop(y_pulse_generator_timer);
-		timerDetachInterrupt(y_pulse_generator_timer);
-		timerEnd(y_pulse_generator_timer);
-	}
-}
 
-void MotorDriver::SetX(float x)
-{
-	if(x < MOTOR_DRIVER_X_COARSE)
-	{
-		x_target_location = x;
-	}
-	else
-	{
-		x_target_location = MOTOR_DRIVER_X_COARSE;
-	}
-	x_target_half_pulse_counter = x_target_location * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
-
-	if(x_pulse_frequency != x_pulse_last_frequency_command)
-	{
-		x_pulse_last_frequency_command = x_pulse_frequency;
-		StartPulses();
-	}
-
-	is_command_new = true;
-}
-
-void MotorDriver::SetY(float y)
-{
-	if(y < MOTOR_DRIVER_Y_COARSE)
-	{
-		y_target_location = y;
-	}
-	else
-	{
-		y_target_location = MOTOR_DRIVER_Y_COARSE;
-	}
-
-	y_target_half_pulse_counter = y_target_location * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
-
-	if(y_pulse_frequency != y_pulse_last_frequency_command)
-	{
-		y_pulse_last_frequency_command = y_pulse_frequency;
-		StartPulses();
-	}
-	is_command_new = true;
 }
 
 void MotorDriver::SetXY(float x, float y)
 {
-	if(x < MOTOR_DRIVER_X_COARSE)
-	{
-		x_target_location = x;
-	}
-	else
-	{
-		x_target_location = MOTOR_DRIVER_X_COARSE;
-	}
-	if(y < MOTOR_DRIVER_Y_COARSE)
-	{
-		y_target_location = y;
-	}
-	else
-	{
-		y_target_location = MOTOR_DRIVER_Y_COARSE;
-	}
-	x_target_half_pulse_counter = x_target_location * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
-	y_target_half_pulse_counter = y_target_location * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
-
-	if(x_pulse_frequency != x_pulse_last_frequency_command)
-	{
-		x_pulse_last_frequency_command = x_pulse_frequency;
-		StartPulses();
-	}
-	if(y_pulse_frequency != y_pulse_last_frequency_command)
-	{
-		y_pulse_last_frequency_command = y_pulse_frequency;
-		StartPulses();
-	}
-
-	is_command_new = true;
+	SetXY(x, y, x_command_speed, y_command_speed);
 }
 
 /**
@@ -355,49 +932,60 @@ void MotorDriver::SetXY(float x, float y)
  */
 void MotorDriver::SetXY(float x, float y, float x_speed, float y_speed)
 {
+	SetXY(x, y, x_speed, y_speed, MOTOR_DRIVER_X_DEFAULT_ACCELERAYION, MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION);
+}
+
+
+/**
+ * speed is mm/s, acceleration is mm/s^2 and positive
+ */
+void MotorDriver::SetXY(float x, float y, float x_speed, float y_speed, float x_acceleration, float y_acceleration)
+{
 	if(x < MOTOR_DRIVER_X_COARSE)
 	{
-		x_target_location = x;
+		x_command_location = x;
 	}
 	else
 	{
-		x_target_location = MOTOR_DRIVER_X_COARSE;
+		x_command_location = MOTOR_DRIVER_X_COARSE;
 	}
 	if(y < MOTOR_DRIVER_Y_COARSE)
 	{
-		y_target_location = y;
+		y_command_location = y;
 	}
 	else
 	{
-		y_target_location = MOTOR_DRIVER_Y_COARSE;
-	}
-	x_target_half_pulse_counter = x_target_location * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
-	y_target_half_pulse_counter = y_target_location * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
-	x_pulse_frequency = x_speed * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH;
-	if(x_pulse_frequency < 10 || x_pulse_frequency > 20000)
-	{
-		x_pulse_frequency = 1000;
+		y_command_location = MOTOR_DRIVER_Y_COARSE;
 	}
 
-	y_pulse_frequency = y_speed * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH;
-	if(y_pulse_frequency < 10 || y_pulse_frequency > 20000)
+	if(x_acceleration < 0)
 	{
-		y_pulse_frequency = 1000;
+		x_acceleration *= -1.0f;
+	}
+	if(y_acceleration < 0)
+	{
+		y_acceleration *= -1.0f;
+	}
+	if(x_speed < 0)
+	{
+		x_speed *= -1.0f;
+	}
+	if(y_speed < 0)
+	{
+		y_speed *= -1.0f;
 	}
 
-	if(x_pulse_frequency != x_pulse_last_frequency_command)
-	{
-		x_pulse_last_frequency_command = x_pulse_frequency;
-		StartPulses();
-	}
-	if(y_pulse_frequency != y_pulse_last_frequency_command)
-	{
-		y_pulse_last_frequency_command = y_pulse_frequency;
-		StartPulses();
-	}
+	x_target_half_pulse_counter = x_command_location * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
+	y_target_half_pulse_counter = y_command_location * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
+
+	x_command_acceleration = x_acceleration;
+	y_command_acceleration = y_acceleration;
+	x_command_speed = x_speed;
+	y_command_speed = y_speed;
 
 	is_command_new = true;
 }
+
 
 void MotorDriver::GetXY(float * x, float * y)
 {
@@ -409,5 +997,42 @@ void MotorDriver::SetXYCurrentPosition(float x, float y)
 {
 	x_current_half_pulse_counter = x * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
 	y_current_half_pulse_counter = y * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
+}
+
+MotorDriver::MOTOR_STATE MotorDriver::GetYState()
+{
+	return y_motor_state;
+}
+MotorDriver::MOTOR_STATE MotorDriver::GetXState()
+{
+	return x_motor_state;
+}
+
+uint32_t MotorDriver::XSpeedToFrequency(float speed)
+{
+	uint32_t frequency = abs(speed) * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH;
+	if(frequency < 10)
+	{
+		frequency = 10;
+	}
+	if(frequency > 20000)
+	{
+		frequency = 20000;
+	}
+	return (frequency);
+}
+
+uint32_t MotorDriver::YSpeedToFrequency(float speed)
+{
+	uint32_t frequency = abs(speed) * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH;
+	if(frequency < 10)
+	{
+		frequency = 10;
+	}
+	if(frequency > 20000)
+	{
+		frequency = 20000;
+	}
+	return (frequency);
 }
 
