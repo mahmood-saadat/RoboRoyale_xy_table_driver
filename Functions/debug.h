@@ -13,7 +13,7 @@
 static WiFiUDP	udp;
 template<typename... Args>
 void DEBUG_printf(Args... args){
-	Serial.printf(args...);
+//	Serial.printf(args...);
 	udp.beginPacket("192.168.1.255", 5480);
 	udp.printf(args...);
 	udp.endPacket();

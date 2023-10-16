@@ -78,6 +78,12 @@ public:
 	motor_state_t GetXState();
 	motor_state_t GetYState();
 
+	// There are the limit switch events. The class variables are not accessible from ISR. We call these function to resert the variables.
+	void LimitXStartEvent();
+	void LimitXEndEvent();
+	void LimitYStartEvent();
+	void LimitYEndEvent();
+
 protected:
 
 private:

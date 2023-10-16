@@ -37,7 +37,7 @@
 #define		MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION				1000
 
 #define		MOTOR_DRIVER_X_COARSE							580.0f//364.0f
-#define		MOTOR_DRIVER_Y_COARSE							150//610.0f//500.0f
+#define		MOTOR_DRIVER_Y_COARSE							610.0f//500.0f
 
 #define		MOTOR_DRIVER_X_DEFAULT_ACCELERAYION				10.0f// mm/s^2
 #define		MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION				10.0f// mm/s^2
@@ -129,10 +129,17 @@ void IRAM_ATTR onXTimer()
 	if(digitalRead(MOTOR_DRIVER_X_START_LIMIT_SWITCH_PIN) == 1)
 	{
 		digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 1);
+		motorDriver.LimitXStartEvent();
 		x_current_half_pulse_counter = -1500;//0;
 		x_target_half_pulse_counter = 0;
 		x_command_location = 0.0f;
 		is_x_zero_detected = true;
+	}
+	if(digitalRead(MOTOR_DRIVER_X_END_LIMIT_SWITCH_PIN) == 1)
+	{
+		digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
+		motorDriver.LimitXEndEvent();
+		is_x_end_detected = true;
 	}
 
 }
@@ -184,9 +191,16 @@ void IRAM_ATTR onYTimer()
 	if(digitalRead(MOTOR_DRIVER_Y_START_LIMIT_SWITCH_PIN) == 1)
 	{
 		digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 1);
+		motorDriver.LimitYStartEvent();
 		y_current_half_pulse_counter = -1500;//0;
 		y_target_half_pulse_counter = 0;
 		y_command_location = 0.0f;
+		is_y_zero_detected = true;
+	}
+	if(digitalRead(MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN) == 1)
+	{
+		digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
+		motorDriver.LimitYEndEvent();
 		is_y_zero_detected = true;
 	}
 }
@@ -1007,6 +1021,47 @@ MotorDriver::MOTOR_STATE MotorDriver::GetXState()
 {
 	return x_motor_state;
 }
+
+/**
+ * At the moment, for both start and end, we just need to reset everthing
+ */
+void MotorDriver::LimitXStartEvent()
+{
+	x_command_speed = MOTOR_DRIVER_X_MIN_SPEED;
+	x_target_speed = 0.0f;
+	x_current_speed = 0.0f;
+	x_command_acceleration = MOTOR_DRIVER_X_DEFAULT_ACCELERAYION;
+	x_current_acceleration = 0.0f;
+	x_motor_state = MOTOR_STATE::IDLE;
+}
+void MotorDriver::LimitXEndEvent()
+{
+	x_command_speed = MOTOR_DRIVER_X_MIN_SPEED;
+	x_target_speed = 0.0f;
+	x_current_speed = 0.0f;
+	x_command_acceleration = MOTOR_DRIVER_X_DEFAULT_ACCELERAYION;
+	x_current_acceleration = 0.0f;
+	x_motor_state = MOTOR_STATE::IDLE;
+}
+void MotorDriver::LimitYStartEvent()
+{
+	y_command_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+	y_target_speed = 0.0f;
+	y_current_speed = 0.0f;
+	y_command_acceleration = MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION;
+	y_current_acceleration = 0.0f;
+	y_motor_state = MOTOR_STATE::IDLE;
+}
+void MotorDriver::LimitYEndEvent()
+{
+	y_command_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+	y_target_speed = 0.0f;
+	y_current_speed = 0.0f;
+	y_command_acceleration = MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION;
+	y_current_acceleration = 0.0f;
+	y_motor_state = MOTOR_STATE::IDLE;
+}
+
 
 uint32_t MotorDriver::XSpeedToFrequency(float speed)
 {
