@@ -63,6 +63,8 @@ private:
 
 	bool					is_ready		= false;
 
+	uint64_t				last_micros 	= 0L;
+
 public:
 	//------------------------------ Public functions  -------------------------------------
 	MotorDriver();

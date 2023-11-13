@@ -15,7 +15,7 @@
 #include <esp_task_wdt.h>
 #include <Arduino.h>
 
-#define		MOTOR_DRIVER_LOOP_DT_MS							10
+#define		MOTOR_DRIVER_LOOP_MS							1
 #define 	MOTOR_DRIVER_WDT_PULSE_GENERATOR_TASK_TIMEOUT 	5000
 #define		MOTOR_DRIVER_PULSE_GENERATOR_DEAD_BAND			1
 #define		MOTOR_DRIVER_ESP_FREQUENCY						80000000
@@ -50,7 +50,8 @@
 #define		MOTOR_DRIVER_X_ERR_MAX							1000.0f
 #define		MOTOR_DRIVER_Y_ERR_MAX							1000.0f
 
-#define		MOTOR_DRIVER_LOCATION_DEADBAND					0.01
+#define		MOTOR_DRIVER_LOCATION_DEADBAND					0.05f
+#define		MOTOR_DRIVER_LOCATION_REM_MIN					MOTOR_DRIVER_LOCATION_DEADBAND
 
 
 // PID Controller Constants
@@ -263,7 +264,7 @@ void MotorDriver::MainTask()
 		UpdatePulseFrequency();
 		//Serial.printf("[MotorDriver] Waiting for zero!\r\n");
 		esp_task_wdt_reset();
-		vTaskDelay(MOTOR_DRIVER_LOOP_DT_MS/portTICK_PERIOD_MS);
+		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
 
 	is_ready = true;
@@ -297,7 +298,7 @@ void MotorDriver::MainTask()
 		UpdatePulseFrequency();
 //		//Serial.printf("[MotorDriver] Current: %d, Target: %d\r\n", x_current_half_pulse_counter, x_target_half_pulse_counter);
 		PrintStackWatermark();
-		vTaskDelay(MOTOR_DRIVER_LOOP_DT_MS/portTICK_PERIOD_MS);
+		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
 }
 
@@ -575,9 +576,18 @@ void MotorDriver::UpdatePulseFrequency()
 	int8_t x_accel_sign = 1;
 	int8_t y_accel_sign = 1;
 
+	float tmp_acceleration = 1.0f;
+
 	float x_cur = 0.0f;
 	float y_cur = 0.0f;
 	GetXY(&x_cur, &y_cur);
+
+	float dt = 0.000001f;
+	if(micros() > last_micros)
+	{
+		dt = (micros() - last_micros);
+	}
+	last_micros = micros();
 
 	UpdateXState();
 	UpdateYState();
@@ -590,13 +600,20 @@ void MotorDriver::UpdatePulseFrequency()
 
 	case MOTOR_STATE::ACCELERATION:
 	case MOTOR_STATE::DECELERATION:
+		tmp_acceleration = abs(x_target_speed - x_current_speed)/(dt/1000000.0f);//((float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f);
+		if(tmp_acceleration > x_command_acceleration)
+		{
+			tmp_acceleration = x_command_acceleration;
+		}
 		if(x_current_speed < x_target_speed)
 		{
-			x_current_speed = ((x_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+//			x_current_speed = ((tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+			x_current_speed = ((tmp_acceleration*(dt/1000000.0f)) + x_current_speed);
 		}
 		else
 		{
-			x_current_speed = ((-1*x_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+//			x_current_speed = ((-1*tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
+			x_current_speed = ((-1*tmp_acceleration*(dt/1000000.0f)) + x_current_speed);
 		}
 		break;
 	case MOTOR_STATE::CONSTANT_SPEED:
@@ -624,13 +641,20 @@ void MotorDriver::UpdatePulseFrequency()
 
 	case MOTOR_STATE::ACCELERATION:
 	case MOTOR_STATE::DECELERATION:
+		tmp_acceleration = abs(y_target_speed - y_current_speed)/(dt/1000000.0f);//((float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f);
+		if(tmp_acceleration > y_command_acceleration)
+		{
+			tmp_acceleration = y_command_acceleration;
+		}
 		if(y_current_speed < y_target_speed)
 		{
-			y_current_speed = ((y_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+//			y_current_speed = ((tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+			y_current_speed = ((tmp_acceleration*(dt/1000000.0f)) + y_current_speed);
 		}
 		else
 		{
-			y_current_speed = ((-1*y_command_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+//			y_current_speed = ((-1*tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
+			y_current_speed = ((-1*tmp_acceleration*(dt/1000000.0f)) + y_current_speed);
 		}
 		break;
 	case MOTOR_STATE::CONSTANT_SPEED:
@@ -652,9 +676,9 @@ void MotorDriver::UpdatePulseFrequency()
 
 	StartPulses(x_current_speed, y_current_speed);
 
-	float y_rem = GetYrem();
-	DEBUG_printf("[Y] speed: %f, com: %f, tar: %f, loc; cur: %f, com: %f, rem: %f, mode: %d\n",
-			y_current_speed, y_command_speed, y_target_speed, y_cur, y_command_location, y_rem, y_motor_state);
+	float x_rem = GetXrem();
+	DEBUG_printf("[X] speed: %f, com: %f, tar: %f, loc; cur: %f, com: %f, rem: %f, mode: %d, dt:%f\n",
+			x_current_speed, x_command_speed, x_target_speed, x_cur, x_command_location, x_rem, x_motor_state, dt);
 }
 
 void MotorDriver::UpdateXState(void)
@@ -785,8 +809,6 @@ void MotorDriver::UpdateYState(void)
 	case MOTOR_STATE::ACCELERATION:
 		if((SIGN(y_current_speed) == SIGN(y_target_speed)) && (abs(y_current_speed) >= abs(y_target_speed)))
 		{
-			DEBUG_printf("[2] speed: %d, tar: %d\n",
-						SIGN(y_current_speed), SIGN(y_target_speed));
 			y_motor_state = MOTOR_STATE::CONSTANT_SPEED;
 		}
 		if(abs(y_cur - y_command_location) < y_rem)
@@ -860,13 +882,23 @@ void MotorDriver::UpdateYState(void)
 float MotorDriver::GetXrem()
 {
 //	return 0.5f*(x_current_speed - x_target_speed)*(x_current_speed - x_target_speed)/x_command_acceleration;
-	return 0.5f*(x_current_speed)*(x_current_speed)/x_command_acceleration;
+	float rem = 0.5f*(x_current_speed)*(x_current_speed)/x_command_acceleration;
+	if(rem < MOTOR_DRIVER_LOCATION_REM_MIN)
+	{
+		rem = MOTOR_DRIVER_LOCATION_REM_MIN;
+	}
+	return rem;
 }
 
 float MotorDriver::GetYrem()
 {
 //	return 0.5f*(y_current_speed - y_target_speed)*(y_current_speed - y_target_speed)/y_command_acceleration;
-	return 0.5f*(y_current_speed)*(y_current_speed)/y_command_acceleration;
+	float rem = 0.5f*(y_current_speed)*(y_current_speed)/y_command_acceleration;
+	if(rem < MOTOR_DRIVER_LOCATION_REM_MIN)
+	{
+		rem = MOTOR_DRIVER_LOCATION_REM_MIN;
+	}
+	return rem;
 }
 
 
