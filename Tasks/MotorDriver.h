@@ -43,11 +43,10 @@ private:
 	motor_state_t			x_motor_state = IDLE;
 	motor_state_t			y_motor_state = IDLE;
 
-	float					x_command_speed	= 5.0f; // mm/s - This is set from outside of library. It can be negative. The command from outside of this module is always
-	// positive; The sign must be set according to the state and location command.
+	float					x_command_speed	= 5.0f; // mm/s - This is set from outside of library. It can be negative. But it will be converted to make sure it is positive value.
 	float					x_current_speed	= 0.0f; // mm/s - The current speed
 	float					x_target_speed = 0.0f; // mm/s - The target speed depending on the state
-	float					x_command_acceleration = 1.0f;	//mm/s^2
+	float					x_command_acceleration = 1.0f;	//mm/s^2 and always positive
 	float					x_current_acceleration = 1.0f;
 //	float					x_integral	= 0.0f;
 //	float 					x_previos_err = 0.0f;
@@ -111,6 +110,9 @@ private:
 
 	float					GetXrem();
 	float					GetYrem();
+
+	void					SetXTargetSpeedToMin(float x_cur);
+	void					SetYTargetSpeedToMin(float y_cur);
 };
 
 extern MotorDriver motorDriver;

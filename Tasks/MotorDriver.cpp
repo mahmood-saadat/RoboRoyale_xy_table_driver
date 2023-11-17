@@ -39,8 +39,11 @@
 #define		MOTOR_DRIVER_X_COARSE							580.0f//364.0f
 #define		MOTOR_DRIVER_Y_COARSE							610.0f//500.0f
 
-#define		MOTOR_DRIVER_X_DEFAULT_ACCELERAYION				10.0f// mm/s^2
-#define		MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION				10.0f// mm/s^2
+#define		MOTOR_DRIVER_X_DEFAULT_ACCELERAYION				20.0f// mm/s^2
+#define		MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION				20.0f// mm/s^2
+
+#define		MOTOR_DRIVER_X_MAX_ACCELERAYION					100.0f// mm/s^2
+#define		MOTOR_DRIVER_Y_MAX_ACCELERAYION					100.0f// mm/s^2
 
 #define		MOTOR_DRIVER_X_MIN_SPEED						0.01f// mm/s
 #define		MOTOR_DRIVER_Y_MIN_SPEED						0.01f// mm/s
@@ -53,11 +56,6 @@
 #define		MOTOR_DRIVER_LOCATION_DEADBAND					0.05f
 #define		MOTOR_DRIVER_LOCATION_REM_MIN					MOTOR_DRIVER_LOCATION_DEADBAND
 
-
-// PID Controller Constants
-#define 	KP 												0.001 		// Proportional Gain
-#define 	KI 												0.0001 		// Integral Gain
-#define 	KD 												0.00001 		// Derivative Gain
 
 #define		ABS(x)  		(x<0)?-x:x
 #define		SIGN(x)			((x>=0)?(int)1:(int)-1)
@@ -595,7 +593,8 @@ void MotorDriver::UpdatePulseFrequency()
 	switch(x_motor_state)
 	{
 	case MOTOR_STATE::IDLE:
-
+		SetXTargetSpeedToMin(x_cur);
+		x_current_speed = x_target_speed;
 		break;
 
 	case MOTOR_STATE::ACCELERATION:
@@ -609,11 +608,19 @@ void MotorDriver::UpdatePulseFrequency()
 		{
 //			x_current_speed = ((tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
 			x_current_speed = ((tmp_acceleration*(dt/1000000.0f)) + x_current_speed);
+			if(x_current_speed > x_target_speed)
+			{
+				x_current_speed = x_target_speed;
+			}
 		}
 		else
 		{
 //			x_current_speed = ((-1*tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + x_current_speed);
 			x_current_speed = ((-1*tmp_acceleration*(dt/1000000.0f)) + x_current_speed);
+			if(x_current_speed < x_target_speed)
+			{
+				x_current_speed = x_target_speed;
+			}
 		}
 		break;
 	case MOTOR_STATE::CONSTANT_SPEED:
@@ -636,7 +643,8 @@ void MotorDriver::UpdatePulseFrequency()
 	switch(y_motor_state)
 	{
 	case MOTOR_STATE::IDLE:
-
+		SetYTargetSpeedToMin(y_cur);
+		y_current_speed = y_target_speed;
 		break;
 
 	case MOTOR_STATE::ACCELERATION:
@@ -650,11 +658,19 @@ void MotorDriver::UpdatePulseFrequency()
 		{
 //			y_current_speed = ((tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
 			y_current_speed = ((tmp_acceleration*(dt/1000000.0f)) + y_current_speed);
+			if(y_current_speed > y_target_speed)
+			{
+				y_current_speed = y_target_speed;
+			}
 		}
 		else
 		{
 //			y_current_speed = ((-1*tmp_acceleration*(float)MOTOR_DRIVER_LOOP_DT_MS/1000.0f) + y_current_speed);
 			y_current_speed = ((-1*tmp_acceleration*(dt/1000000.0f)) + y_current_speed);
+			if(y_current_speed < y_target_speed)
+			{
+				y_current_speed = y_target_speed;
+			}
 		}
 		break;
 	case MOTOR_STATE::CONSTANT_SPEED:
@@ -684,7 +700,7 @@ void MotorDriver::UpdatePulseFrequency()
 void MotorDriver::UpdateXState(void)
 {
 	// Needed to add a little margin so it wouldn't switch between modes and make a smooth stop
-	float x_rem = 1.3f*GetXrem();
+	float x_rem = 1.0f*GetXrem();
 	float x_cur = 0.0f;
 	float y_cur = 0.0f;
 	GetXY(&x_cur, &y_cur);
@@ -705,6 +721,10 @@ void MotorDriver::UpdateXState(void)
 			}
 			x_motor_state = MOTOR_STATE::ACCELERATION;
 		}
+		else
+		{
+//			x_current_speed = 0.0f;
+		}
 		break;
 
 	case MOTOR_STATE::ACCELERATION:
@@ -714,7 +734,7 @@ void MotorDriver::UpdateXState(void)
 		}
 		if(abs(x_cur - x_command_location) < x_rem)
 		{
-			x_target_speed = MOTOR_DRIVER_X_MIN_SPEED;
+			SetXTargetSpeedToMin(x_cur);
 			x_motor_state = MOTOR_STATE::DECELERATION;
 		}
 		else
@@ -733,8 +753,9 @@ void MotorDriver::UpdateXState(void)
 		if(abs(x_current_speed) <= MOTOR_DRIVER_X_MIN_SPEED)
 		{
 			x_motor_state = MOTOR_STATE::IDLE;
+			SetXTargetSpeedToMin(x_cur);
 		}
-		if(abs(x_cur - x_command_location) > x_rem)
+		if(abs(x_cur - x_command_location) > (3.0f*x_rem))
 		{
 			if(x_cur < x_command_location)
 			{
@@ -751,7 +772,7 @@ void MotorDriver::UpdateXState(void)
 
 		if(abs(x_cur - x_command_location) < x_rem)
 		{
-			x_target_speed = MOTOR_DRIVER_X_MIN_SPEED;
+			SetXTargetSpeedToMin(x_cur);
 			x_motor_state = MOTOR_STATE::DECELERATION;
 		}
 		else if(
@@ -783,7 +804,7 @@ void MotorDriver::UpdateXState(void)
 void MotorDriver::UpdateYState(void)
 {
 	// Needed to add a little margin so it wouldn't switch between modes and make a smooth stop
-	float y_rem = 1.3f*GetYrem();
+	float y_rem = 1.0f*GetYrem();
 	float x_cur = 0.0f;
 	float y_cur = 0.0f;
 	GetXY(&x_cur, &y_cur);
@@ -804,6 +825,10 @@ void MotorDriver::UpdateYState(void)
 			}
 			y_motor_state = MOTOR_STATE::ACCELERATION;
 		}
+		else
+		{
+//			y_current_speed = 0.0f;
+		}
 		break;
 
 	case MOTOR_STATE::ACCELERATION:
@@ -813,7 +838,7 @@ void MotorDriver::UpdateYState(void)
 		}
 		if(abs(y_cur - y_command_location) < y_rem)
 		{
-			y_target_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+			SetYTargetSpeedToMin(y_cur);
 			y_motor_state = MOTOR_STATE::DECELERATION;
 		}
 		else
@@ -832,8 +857,9 @@ void MotorDriver::UpdateYState(void)
 		if(abs(y_current_speed) <= MOTOR_DRIVER_Y_MIN_SPEED)
 		{
 			y_motor_state = MOTOR_STATE::IDLE;
+			SetYTargetSpeedToMin(y_cur);
 		}
-		if(abs(y_cur - y_command_location) > y_rem)
+		if(abs(y_cur - y_command_location) > (3.0f*y_rem))
 		{
 			if(y_cur < y_command_location)
 			{
@@ -850,7 +876,7 @@ void MotorDriver::UpdateYState(void)
 
 		if(abs(y_cur - y_command_location) < y_rem)
 		{
-			y_target_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+			SetYTargetSpeedToMin(y_cur);
 			y_motor_state = MOTOR_STATE::DECELERATION;
 		}
 		else if(
@@ -1003,6 +1029,14 @@ void MotorDriver::SetXY(float x, float y, float x_speed, float y_speed, float x_
 	{
 		y_command_location = MOTOR_DRIVER_Y_COARSE;
 	}
+	if(x_acceleration > MOTOR_DRIVER_X_MAX_ACCELERAYION)
+	{
+		x_acceleration = MOTOR_DRIVER_X_MAX_ACCELERAYION;
+	}
+	if(y_acceleration > MOTOR_DRIVER_Y_MAX_ACCELERAYION)
+	{
+		y_acceleration = MOTOR_DRIVER_Y_MAX_ACCELERAYION;
+	}
 
 	if(x_acceleration < 0)
 	{
@@ -1123,3 +1157,25 @@ uint32_t MotorDriver::YSpeedToFrequency(float speed)
 	return (frequency);
 }
 
+void MotorDriver::SetXTargetSpeedToMin(float x_cur)
+{
+	if(x_cur < x_command_location)
+	{
+		x_target_speed = MOTOR_DRIVER_X_MIN_SPEED;
+	}
+	else
+	{
+		x_target_speed = -1.0f*MOTOR_DRIVER_X_MIN_SPEED;
+	}
+}
+void MotorDriver::SetYTargetSpeedToMin(float y_cur)
+{
+	if(y_cur < y_command_location)
+	{
+		y_target_speed = MOTOR_DRIVER_Y_MIN_SPEED;
+	}
+	else
+	{
+		y_target_speed = -1.0f*MOTOR_DRIVER_Y_MIN_SPEED;
+	}
+}
