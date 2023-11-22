@@ -8,7 +8,7 @@ void setup()
 	Serial.begin(115200);
 	//Serial.printf("Started!\r\n");
 	WifiManager::WiFiOn();
-	//commands.begin();
+	commands.begin();
 	motorDriver.begin();
 }
 

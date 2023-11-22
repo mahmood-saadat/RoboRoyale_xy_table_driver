@@ -254,8 +254,9 @@ TaskFunction_t MotorDriver::TaskStart(void * pvParameters)
  */
 void MotorDriver::MainTask()
 {
-	uint32_t counter = 0;
-	SetXY(-MOTOR_DRIVER_X_COARSE-5, -MOTOR_DRIVER_Y_COARSE-5, 10.0f, 10.0f);
+	uint16_t time_counter = 1000;
+
+	SetXY(-MOTOR_DRIVER_X_COARSE-5.0f, -MOTOR_DRIVER_Y_COARSE-5.0f, 10.0f, 10.0f);
 
 	while(is_x_zero_detected == false || is_y_zero_detected == false)
 	{
@@ -265,36 +266,22 @@ void MotorDriver::MainTask()
 		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
 
+	// Some delay to make sure the setup is separated from
+	while((time_counter--) > 0)
+	{
+		UpdatePulseFrequency();
+		//Serial.printf("[MotorDriver] Waiting for zero!\r\n");
+		esp_task_wdt_reset();
+		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
+	}
+
 	is_ready = true;
-	SetXY(MOTOR_DRIVER_X_COARSE, 0, 5.0f, 5.0f);
+	SetXY(MOTOR_DRIVER_X_COARSE, 0.0f, 5.0f, 5.0f);
 
 	while(1){
 		esp_task_wdt_reset();
 
-		if(counter>2000)
-		{
-			SetXY(0.0f, 0.0f, 20.0f, 20.0f);
-		}
-		else if(counter>1700)
-		{
-			SetXY(150, 150, 20.0f, 20.0f);
-		}
-		else if(counter>1000)
-		{
-			SetXY(10, 10, 5.0f, 5.0f);
-		}
-		else if(counter>50)
-		{
-			SetXY(100, 100, 25.0f, 25.0f);
-		}
-		counter ++;
-		if(counter > 2300)
-		{
-			counter = 0;
-		}
-
 		UpdatePulseFrequency();
-//		//Serial.printf("[MotorDriver] Current: %d, Target: %d\r\n", x_current_half_pulse_counter, x_target_half_pulse_counter);
 		PrintStackWatermark();
 		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
@@ -1094,8 +1081,8 @@ MotorDriver::MOTOR_STATE MotorDriver::GetXState()
 void MotorDriver::LimitXStartEvent()
 {
 	x_command_speed = MOTOR_DRIVER_X_MIN_SPEED;
-	x_target_speed = 0.0f;
-	x_current_speed = 0.0f;
+	x_target_speed = MOTOR_DRIVER_X_MAX_SPEED;
+	x_current_speed = MOTOR_DRIVER_X_MAX_SPEED/10.0f;
 	x_command_acceleration = MOTOR_DRIVER_X_DEFAULT_ACCELERAYION;
 	x_current_acceleration = 0.0f;
 	x_motor_state = MOTOR_STATE::IDLE;
@@ -1112,8 +1099,8 @@ void MotorDriver::LimitXEndEvent()
 void MotorDriver::LimitYStartEvent()
 {
 	y_command_speed = MOTOR_DRIVER_Y_MIN_SPEED;
-	y_target_speed = 0.0f;
-	y_current_speed = 0.0f;
+	y_target_speed = MOTOR_DRIVER_Y_MAX_SPEED;
+	y_current_speed = MOTOR_DRIVER_Y_MAX_SPEED/10.0f;
 	y_command_acceleration = MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION;
 	y_current_acceleration = 0.0f;
 	y_motor_state = MOTOR_STATE::IDLE;
