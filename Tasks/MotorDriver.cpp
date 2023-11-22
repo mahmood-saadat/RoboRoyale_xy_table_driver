@@ -16,6 +16,7 @@
 #define 	MOTOR_DRIVER_WDT_PULSE_GENERATOR_TASK_TIMEOUT 	5000
 #define		MOTOR_DRIVER_PULSE_GENERATOR_DEAD_BAND			1
 #define		MOTOR_DRIVER_ESP_FREQUENCY						80000000
+#define		MOTOR_DRIVER_TIMER_DIVIDER						2
 
 #define		MOTOR_DRIVER_X_PULSE_PIN						14
 #define		MOTOR_DRIVER_X_DIRECTION_PIN					13
@@ -163,6 +164,8 @@ void MotorDriver::begin(){
 	digitalWrite(MOTOR_DRIVER_X_DIRECTION_PIN, 0);
 	digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
 
+	TimerInit();
+
 	xTaskCreate((TaskFunction_t)MotorDriver::TaskStart, "MotorDriverTask", 8192, this, 50, &mainTask);
 
 	//Serial.println("[MotorDriver] Setup is done.");
@@ -225,52 +228,69 @@ bool MotorDriver::IsReady()
 	return is_ready;
 }
 
-void MotorDriver::StartPulses()
+void MotorDriver::TimerInit()
 {
-	uint32_t prescaler = 0;
-	StopPulses();
-
-	prescaler = MOTOR_DRIVER_ESP_FREQUENCY/8000/x_pulse_frequency/2;
-	//Serial.printf("[MotorDriver] Setting the X timer; prescaler: %d\r\n", prescaler);
-	x_pulse_generator_timer = timerBegin(0, 8000, true);
+	x_pulse_generator_timer = timerBegin(0, MOTOR_DRIVER_TIMER_DIVIDER, true);
 	timerAttachInterrupt(x_pulse_generator_timer, &onXTimer, true);
 	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
-	timerAlarmWrite(x_pulse_generator_timer, prescaler, true);
+	timerAlarmWrite(x_pulse_generator_timer, 40000000, true);
 	/* Start an alarm */
 	timerAlarmEnable(x_pulse_generator_timer);
 
-	prescaler = MOTOR_DRIVER_ESP_FREQUENCY/8000/y_pulse_frequency/2;
-	//Serial.printf("[MotorDriver] Setting the Y timer; prescaler: %d\r\n", prescaler);
-	y_pulse_generator_timer = timerBegin(1, 8000, true);
+	y_pulse_generator_timer = timerBegin(1, MOTOR_DRIVER_TIMER_DIVIDER, true);
 	timerAttachInterrupt(y_pulse_generator_timer, &onYTimer, true);
 	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
-	timerAlarmWrite(y_pulse_generator_timer, prescaler, true);
+	timerAlarmWrite(y_pulse_generator_timer, 40000000, true);
 	/* Start an alarm */
 	timerAlarmEnable(y_pulse_generator_timer);
 }
 
+void MotorDriver::StartPulses(uint32_t x_pulse_frequency, uint32_t y_pulse_frequency)
+{
+	uint32_t x_prescaler = 0;
+	uint32_t y_prescaler = 0;
+	StopPulses();
+
+	if(x_pulse_frequency == 0)
+	{
+		x_pulse_frequency = 10;
+	}
+	if(y_pulse_frequency == 0)
+	{
+		y_pulse_frequency = 10;
+	}
+
+	x_prescaler = MOTOR_DRIVER_ESP_FREQUENCY/MOTOR_DRIVER_TIMER_DIVIDER/x_pulse_frequency/2;
+	if(0 == x_prescaler)
+	{
+		x_prescaler = 1;
+	}
+	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
+	timerAlarmWrite(x_pulse_generator_timer, x_prescaler, true);
+
+	y_prescaler = MOTOR_DRIVER_ESP_FREQUENCY/MOTOR_DRIVER_TIMER_DIVIDER/y_pulse_frequency/2;
+	if(0 == y_prescaler)
+	{
+		y_prescaler = 1;
+	}
+	/* Repeat the alarm (third parameter), set to 1 to alarm every single clock */
+	timerAlarmWrite(y_pulse_generator_timer, y_prescaler, true);
+
+}
+
+void MotorDriver::StartPulses(float x_speed, float y_speed)
+{
+	StartPulses(XSpeedToFrequency(x_speed), YSpeedToFrequency(y_speed));
+}
+
+void MotorDriver::StartPulses()
+{
+	StartPulses(x_pulse_frequency, y_pulse_frequency);
+}
+
 void MotorDriver::StopPulses()
 {
-	if(x_pulse_generator_timer != NULL)
-	{
-		/* Repeat the alarm (third parameter) */
-		timerAlarmWrite(x_pulse_generator_timer, 1, false);
-		/* Start an alarm */
-		timerAlarmDisable(x_pulse_generator_timer);
-		timerStop(x_pulse_generator_timer);
-		timerDetachInterrupt(x_pulse_generator_timer);
-		timerEnd(x_pulse_generator_timer);
-	}
-	if(y_pulse_generator_timer != NULL)
-	{
-		/* Repeat the alarm (third parameter) */
-		timerAlarmWrite(y_pulse_generator_timer, 1, false);
-		/* Start an alarm */
-		timerAlarmDisable(y_pulse_generator_timer);
-		timerStop(y_pulse_generator_timer);
-		timerDetachInterrupt(y_pulse_generator_timer);
-		timerEnd(y_pulse_generator_timer);
-	}
+
 }
 
 void MotorDriver::SetX(float x)
@@ -411,3 +431,30 @@ void MotorDriver::SetXYCurrentPosition(float x, float y)
 	y_current_half_pulse_counter = y * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
 }
 
+uint32_t MotorDriver::XSpeedToFrequency(float speed)
+{
+	uint32_t frequency = abs(speed) * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH;
+	if(frequency < 10)
+	{
+		frequency = 10;
+	}
+	if(frequency > 20000)
+	{
+		frequency = 20000;
+	}
+	return (frequency);
+}
+
+uint32_t MotorDriver::YSpeedToFrequency(float speed)
+{
+	uint32_t frequency = abs(speed) * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH;
+	if(frequency < 10)
+	{
+		frequency = 10;
+	}
+	if(frequency > 20000)
+	{
+		frequency = 20000;
+	}
+	return (frequency);
+}

@@ -54,8 +54,13 @@ private:
 	static TaskFunction_t 	TaskStart(void * pvParameters);
 	void 					MainTask();
 	void					PrintStackWatermark();
+	void 					TimerInit();
+	void 					StartPulses(uint32_t x_pulse_frequency, uint32_t y_pulse_frequency);
+	void 					StartPulses(float x_speed, float y_speed);
 	void 					StartPulses();
 	void 					StopPulses();
+	uint32_t 				XSpeedToFrequency(float speed);
+	uint32_t 				YSpeedToFrequency(float speed);
 };
 
 extern MotorDriver motorDriver;
