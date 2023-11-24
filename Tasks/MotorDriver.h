@@ -7,7 +7,7 @@
  * This file provide as is with no guarantee of any sort.
  * Any modification and redistribution of this file is allowed as long as this description is kept at the top of the file.
  *
- *  V1.0.0: Base release
+ *  V2.0.0: Acceleration added
  */
 
 #ifndef __TASKS_MOTORDRIVER_H__
@@ -19,6 +19,7 @@
 
 class MotorDriver{
 public:
+
 	typedef enum MOTOR_STATE{
 		IDLE,
 		ACCELERATION,
@@ -36,9 +37,7 @@ private:
 	uint32_t				stackWatermarkPrintLastMillis = 0;
 	bool					is_command_new = false;
 	uint32_t				x_pulse_frequency = 1000;
-//	uint32_t				x_pulse_last_frequency_command = 1000;
 	uint32_t				y_pulse_frequency = 1000;
-//	uint32_t				y_pulse_last_frequency_command = 1000;
 	bool					is_acceleration_command = false;
 	motor_state_t			x_motor_state = IDLE;
 	motor_state_t			y_motor_state = IDLE;
@@ -48,16 +47,12 @@ private:
 	float					x_target_speed = 0.0f; // mm/s - The target speed depending on the state
 	float					x_command_acceleration = 1.0f;	//mm/s^2 and always positive
 	float					x_current_acceleration = 1.0f;
-//	float					x_integral	= 0.0f;
-//	float 					x_previos_err = 0.0f;
 
 	float					y_command_speed	= 5.0f;
 	float					y_current_speed	= 0.0f;
 	float					y_target_speed = 0.0f;
 	float					y_command_acceleration = 1.0f;
 	float					y_current_acceleration = 1.0f;
-//	float					y_integral	= 0.0f;
-//	float 					y_previos_err = 0.0f;
 
 
 	bool					is_ready		= false;
@@ -69,8 +64,6 @@ public:
 	MotorDriver();
 	void begin();
 	bool IsReady();
-//	void SetX(float x);
-//	void SetY(float y);
 	void SetXY(float x, float y);
 	void SetXY(float x, float y, float x_speed, float y_speed);
 	void SetXY(float x, float y, float x_speed, float y_speed, float x_acceleration, float y_acceleration);
@@ -100,10 +93,6 @@ private:
 	uint32_t				XSpeedToFrequency(float speed);
 	uint32_t				YSpeedToFrequency(float speed);
 
-	//float					CalculateSpeed(float current_speed, float acceleration, float dt);
-//	void 					CalculateSpeed(
-//			float location_command, float current_location, float & integral,
-//			float & prev_error, float & current_speed, float accel);
 	void					UpdatePulseFrequency(void);
 	void 					UpdateXState(void);
 	void 					UpdateYState(void);
