@@ -63,7 +63,8 @@ Tasks/MotorDriver.cpp.o: ../Tasks/MotorDriver.cpp ../Tasks/MotorDriver.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/freertos/include/freertos/task.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/freertos/include/freertos/list.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/freertos/include/esp_additions/freertos/task_snapshot.h \
- /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_system/include/esp_task_wdt.h \
+ ../Tasks/../Functions/debug.h \
+ /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/libraries/WiFi/src/WiFiUdp.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/Arduino.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/esp_arduino_version.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/freertos/include/freertos/semphr.h \
@@ -131,7 +132,10 @@ Tasks/MotorDriver.cpp.o: ../Tasks/MotorDriver.cpp ../Tasks/MotorDriver.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/hal/include/hal/esp_flash_err.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/spi_flash/include/esp_spi_flash.h \
  /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/spi_flash/include/esp_spi_flash_counters.h \
- /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h
+ /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h \
+ /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/Udp.h \
+ /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/cbuf.h \
+ /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_system/include/esp_task_wdt.h
 
 ../Tasks/MotorDriver.h:
 
@@ -263,7 +267,9 @@ Tasks/MotorDriver.cpp.o: ../Tasks/MotorDriver.cpp ../Tasks/MotorDriver.h \
 
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/freertos/include/esp_additions/freertos/task_snapshot.h:
 
-/home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_system/include/esp_task_wdt.h:
+../Tasks/../Functions/debug.h:
+
+/home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/libraries/WiFi/src/WiFiUdp.h:
 
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/Arduino.h:
 
@@ -400,3 +406,9 @@ Tasks/MotorDriver.cpp.o: ../Tasks/MotorDriver.cpp ../Tasks/MotorDriver.h \
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/spi_flash/include/esp_spi_flash_counters.h:
 
 /home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_hw_support/include/soc/esp32/spiram.h:
+
+/home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/Udp.h:
+
+/home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/cores/esp32/cbuf.h:
+
+/home/swacil-electronic/Applications/Sloeber/arduinoPlugin/packages/esp32/hardware/esp32/2.0.6/tools/sdk/esp32/include/esp_system/include/esp_task_wdt.h:
