@@ -201,13 +201,13 @@ void IRAM_ATTR onYTimer()
 		y_current_half_pulse_counter = -1500;
 		y_target_half_pulse_counter = 0;
 		y_command_position = 0.0f;
-		is_y_end_detected = true;
+		is_y_zero_detected = true;
 	}
 	if(digitalRead(MOTOR_DRIVER_Y_END_LIMIT_SWITCH_PIN) == 1)
 	{
 		digitalWrite(MOTOR_DRIVER_Y_DIRECTION_PIN, 0);
 		motorDriver.LimitYEndEvent();
-		is_y_zero_detected = true;
+		is_y_end_detected = true;
 	}
 }
 
@@ -261,10 +261,12 @@ TaskFunction_t MotorDriver::TaskStart(void * pvParameters)
  */
 void MotorDriver::MainTask()
 {
-	uint16_t time_counter = 1000;
+	uint16_t time_counter = 100;
 
 	// Set the initial command for the each axis to a maximum negative value and 5 mm margin to make sure the mechanism reaches the limit switch.
 	SetXY(-MOTOR_DRIVER_X_COARSE - 5.0f, -MOTOR_DRIVER_Y_COARSE - 5.0f, 10.0f, 10.0f);
+
+	DEBUG_printf("Detecting the limit switches.");
 
 	// Wait for limit switch event
 	while(is_x_zero_detected == false || is_y_zero_detected == false)
@@ -275,6 +277,8 @@ void MotorDriver::MainTask()
 		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
 
+	DEBUG_printf("Small delay to separate from limit switch.");
+
 	// Some delay to make sure the setup is separated from limit switch
 	while((time_counter--) > 0)
 	{
@@ -283,9 +287,11 @@ void MotorDriver::MainTask()
 		vTaskDelay(MOTOR_DRIVER_LOOP_MS/portTICK_PERIOD_MS);
 	}
 
+	DEBUG_printf("Starting ...");
+
 	is_ready = true;
 	// We need the x axis to move to the end at the beginning.
-	SetXY(MOTOR_DRIVER_X_COARSE, 0.0f, 5.0f, 5.0f);
+	SetXY(MOTOR_DRIVER_X_COARSE, 0.0f, 15.0f, 5.0f);
 
 	while(1)
 	{
