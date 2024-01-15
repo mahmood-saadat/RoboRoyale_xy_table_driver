@@ -898,6 +898,16 @@ void MotorDriver::SetXYCurrentPosition(float x, float y)
 	y_current_half_pulse_counter = y * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
 }
 
+void MotorDriver::SetXCurrentPosition(float x)
+{
+	x_current_half_pulse_counter = x * MOTOR_DRIVER_X_PULSE_PER_REVOLUTION / MOTOR_DRIVER_X_SCREW_PITCH * 2;
+}
+
+void MotorDriver::SetYCurrentPosition(float y)
+{
+	y_current_half_pulse_counter = y * MOTOR_DRIVER_Y_PULSE_PER_REVOLUTION / MOTOR_DRIVER_Y_SCREW_PITCH * 2;
+}
+
 MotorDriver::MOTOR_STATE MotorDriver::GetYState()
 {
 	return y_motor_state;
@@ -921,12 +931,13 @@ void MotorDriver::LimitXStartEvent()
 }
 void MotorDriver::LimitXEndEvent()
 {
-	x_command_speed = MOTOR_DRIVER_X_MIN_SPEED;
-	x_target_speed = 0.0f;
-	x_current_speed = 0.0f;
+	x_command_speed = MOTOR_DRIVER_X_MAX_SPEED/5;
+	SetXCurrentPosition(MOTOR_DRIVER_X_COARSE + 5.0f);
+//	x_target_speed = 0.0f;
+//	x_current_speed = 0.0f;
 	x_command_acceleration = MOTOR_DRIVER_X_DEFAULT_ACCELERAYION;
-	x_current_acceleration = 0.0f;
-	x_motor_state = MOTOR_STATE::IDLE;
+//	x_current_acceleration = 0.0f;
+//	x_motor_state = MOTOR_STATE::IDLE;
 }
 void MotorDriver::LimitYStartEvent()
 {
@@ -939,12 +950,13 @@ void MotorDriver::LimitYStartEvent()
 }
 void MotorDriver::LimitYEndEvent()
 {
-	y_command_speed = MOTOR_DRIVER_Y_MIN_SPEED;
-	y_target_speed = 0.0f;
-	y_current_speed = 0.0f;
+	y_command_speed = MOTOR_DRIVER_Y_MAX_SPEED/5;
+	SetYCurrentPosition(MOTOR_DRIVER_Y_COARSE + 5.0f);
+//	y_target_speed = 0.0f;
+//	y_current_speed = 0.0f;
 	y_command_acceleration = MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION;
-	y_current_acceleration = 0.0f;
-	y_motor_state = MOTOR_STATE::IDLE;
+//	y_current_acceleration = 0.0f;
+//	y_motor_state = MOTOR_STATE::IDLE;
 }
 
 /**
