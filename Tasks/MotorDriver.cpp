@@ -932,7 +932,7 @@ void MotorDriver::LimitXStartEvent()
 void MotorDriver::LimitXEndEvent()
 {
 	x_command_speed = MOTOR_DRIVER_X_MAX_SPEED/5;
-	SetXCurrentPosition(MOTOR_DRIVER_X_COARSE + 5.0f);
+//	SetXCurrentPosition(MOTOR_DRIVER_X_COARSE + 5.0f);
 //	x_target_speed = 0.0f;
 //	x_current_speed = 0.0f;
 	x_command_acceleration = MOTOR_DRIVER_X_DEFAULT_ACCELERAYION;
@@ -951,7 +951,7 @@ void MotorDriver::LimitYStartEvent()
 void MotorDriver::LimitYEndEvent()
 {
 	y_command_speed = MOTOR_DRIVER_Y_MAX_SPEED/5;
-	SetYCurrentPosition(MOTOR_DRIVER_Y_COARSE + 5.0f);
+//	SetYCurrentPosition(MOTOR_DRIVER_Y_COARSE + 5.0f);
 //	y_target_speed = 0.0f;
 //	y_current_speed = 0.0f;
 	y_command_acceleration = MOTOR_DRIVER_Y_DEFAULT_ACCELERAYION;
