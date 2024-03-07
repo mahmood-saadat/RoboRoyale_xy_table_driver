@@ -261,10 +261,10 @@ TaskFunction_t MotorDriver::TaskStart(void * pvParameters)
  */
 void MotorDriver::MainTask()
 {
-	uint16_t time_counter = 100;
+	uint16_t time_counter = 300;
 
 	// Set the initial command for the each axis to a maximum negative value and 5 mm margin to make sure the mechanism reaches the limit switch.
-	SetXY(-MOTOR_DRIVER_X_COARSE - 5.0f, -MOTOR_DRIVER_Y_COARSE - 5.0f, 10.0f, 10.0f);
+	SetXY(-MOTOR_DRIVER_X_COARSE - 15.0f, -MOTOR_DRIVER_Y_COARSE - 15.0f, 10.0f, 10.0f);
 
 	DEBUG_printf("Detecting the limit switches.");
 
