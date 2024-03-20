@@ -24,12 +24,19 @@
 Commands 		commands;
 WiFiUDP 		wifiUDP;
 
+/**
+ * @fn  Commands()
+ * @brief Constructor
+ *
+ */
 Commands::Commands(){
 	mainTask = NULL;
 }
 
-/*
- * Initialise the class
+/**
+ * @fn void begin()
+ * @brief Initialize the module and start the async task
+ *
  */
 void Commands::begin(){
 	//Serial.println("[Commands] Setup is started ...");
@@ -40,9 +47,14 @@ void Commands::begin(){
 
 }
 
-/*
- * Task function needed to be static and in static members, we could not access class members easily,
+
+/**
+ * @fn TaskFunction_t TaskStart(void*)
+ * @brief Task function needed to be static and in static members, we could not access class members easily,
  * so we created this function and we passed the class as input argument, then we call our main function from here.
+ *
+ * @param pvParameters
+ * @return
  */
 TaskFunction_t Commands::TaskStart(void * pvParameters){
 	Commands* manager;
@@ -53,8 +65,11 @@ TaskFunction_t Commands::TaskStart(void * pvParameters){
 	// It will never get here. The main task never returns.
 	return 0;
 }
-/*
- * The main loop
+
+/**
+ * @fn void MainTask()
+ * @brief  The main loop. Here we have the infinite loop. It checks for any incoming command.
+ *
  */
 void Commands::MainTask() {
 	uint8_t 	receiveBuffer[255] = {0};
@@ -65,20 +80,17 @@ void Commands::MainTask() {
 	while(1){
 		esp_task_wdt_reset();
 
+		// Check if we have the command from UDP port
 		packetSize = wifiUDP.parsePacket();
 		if(packetSize)
 		{
-			//			Serial.printf("Received %d bytes from %s, port %d\n", packetSize,
-			//					wifiUDP.remoteIP().toString().c_str(), wifiUDP.remotePort());
 			int len = wifiUDP.read(receiveBuffer, 255);
 			if (len == 16)
 			{
-				//				for(int index = 0; index < len; index ++)
-				//				{
-				//					Serial.printf(" %x", receiveBuffer[index]);
-				//				}
-				//				Serial.printf("\n");
-
+				//! 4 bytes float: x position
+				//! 4 bytes float: x speed
+				//! 4 bytes float: y position
+				//! 4 bytes float: y speed
 				float x = ConvertToFloat((uint8_t*)&receiveBuffer[0]);
 				float x_speed = ConvertToFloat((uint8_t*)&receiveBuffer[4]);
 				float y = ConvertToFloat((uint8_t*)&receiveBuffer[8]);
@@ -88,7 +100,6 @@ void Commands::MainTask() {
 					motorDriver.SetXY(x, y, x_speed, y_speed);
 					is_any_udp_packet_received = true;
 				}
-				//Serial.printf("[Commands] X: %f, Y: %f, Speed: %f\n", x, y, x_speed);
 			}
 			else
 			{
@@ -96,7 +107,9 @@ void Commands::MainTask() {
 			}
 		}
 
-		// If any packet is received, we have the IP address to send back data
+		//! If any packet is received, we have the IP address to send back data
+		//! 4 bytes float: x position
+		//! 4 bytes float: y position
 		if(is_any_udp_packet_received)
 		{
 			float x = 0.0f;
@@ -110,14 +123,12 @@ void Commands::MainTask() {
 			wifiUDP.endPacket();
 		}
 
-		// Check for commands from serial port
-		// The packet is as this:
-		// 3 bytes header: 0xFF 0xFE 0xFF
-		// 4 bytes float: X target
-		// 4 bytes float: X speed
-		// 4 bytes float: Y target
-		// 4 bytes float: Y speed
-		// 1 byte checksum: sum of the X, Y and speed bytes (everything except the header)
+		//! Check for commands from serial port
+		//! The packet is as this:
+		//! 3 bytes header:
+		//! 	- Position and speed command: 0xFF 0xFE 0xFF
+		//! 	- Reset the position to command value: 0xFF 0xFE 0xFE
+		//! 	- Command for setting the Position, Speed, and acceleration: 0xFF 0xFE 0xFD
 		while(Serial.available() >= 3)
 		{
 			DEBUG_printf("Serial bytes received: %d\r\n", Serial.available());
@@ -127,7 +138,14 @@ void Commands::MainTask() {
 				if(Serial.read() == 0xFE)
 				{
 					uint8_t header = Serial.read();
-					// Check if it's the position/speed command
+					//! Check if it's the position/speed command
+					//! The packet is as this:
+					//! 3 bytes header: 0xFF 0xFE 0xFF
+					//! 4 bytes float: X target
+					//! 4 bytes float: X speed
+					//! 4 bytes float: Y target
+					//! 4 bytes float: Y speed
+					//! 1 byte checksum: sum of the X, Y and speed bytes (everything except the header)
 					if(header == 0xFF)
 					{
 						receive_timeout = 10;
@@ -171,7 +189,7 @@ void Commands::MainTask() {
 						}
 					}
 					// Reset the error command
-					if(header == 0xFE)
+					else if(header == 0xFE)
 					{
 						DEBUG_printf("Serial reset error command header detected.\r\n");
 						receive_timeout = 10;
@@ -211,6 +229,60 @@ void Commands::MainTask() {
 							DEBUG_printf("Not enough bytes in reset command!\r\n");
 						}
 					}
+					//! Check if it's the position/speed/acceleration command
+					//! The packet is as this:
+					//! 3 bytes header: 0xFF 0xFE 0xFD
+					//! 4 bytes float: X target
+					//! 4 bytes float: X speed
+					//! 4 bytes float: X acceleration
+					//! 4 bytes float: Y target
+					//! 4 bytes float: Y speed
+					//! 4 bytes float: Y acceleration
+					//! 1 byte checksum: sum of the X, Y, speed and acceleration bytes (everything except the header)
+					else if(header == 0xFD)
+					{
+						receive_timeout = 10;
+						while(Serial.available() <= 25 && receive_timeout > 0)
+						{
+							receive_timeout --;
+							vTaskDelay(1/portTICK_PERIOD_MS);
+						}
+						DEBUG_printf("Serial command header detected.\r\n");
+						if(Serial.available() >= 25)
+						{
+							// Read the data bytes
+							Serial.read(receiveBuffer, 25);
+							if(receiveBuffer[24] == CalculateChecksum(receiveBuffer, 24))
+							{
+								float x = ConvertToFloat((uint8_t*)&receiveBuffer[0]);
+								float x_speed = ConvertToFloat((uint8_t*)&receiveBuffer[4]);
+								float x_accel = ConvertToFloat((uint8_t*)&receiveBuffer[8]);
+								float y = ConvertToFloat((uint8_t*)&receiveBuffer[12]);
+								float y_speed = ConvertToFloat((uint8_t*)&receiveBuffer[16]);
+								float y_accel = ConvertToFloat((uint8_t*)&receiveBuffer[20]);
+								if(motorDriver.IsReady())
+								{
+									motorDriver.SetXY(x, y, x_speed, y_speed, x_accel, y_accel);
+								}
+
+								SendBackCurrentPosition();
+							}
+							else
+							{
+								DEBUG_printf("Checksum failed; must be: %d is: %d\r\n", CalculateChecksum(receiveBuffer, 16), receiveBuffer[16]);
+								DEBUG_printf("Array: ");
+								for(uint16_t index = 0; index < 17; index ++)
+								{
+									DEBUG_printf("%02X ", receiveBuffer[index]);
+								}
+								DEBUG_printf("\r\n");
+							}
+						}
+						else
+						{
+							DEBUG_printf("Not enough bytes!\r\n");
+						}
+					}
 				}
 			}
 		}
@@ -220,6 +292,11 @@ void Commands::MainTask() {
 	}
 }
 
+/**
+ * @fn void PrintStackWatermark()
+ * @brief Print the remaining stack
+ *
+ */
 void Commands::PrintStackWatermark(){
 	if(millis() > (stackWatermarkPrintLastMillis + 60000)){
 		stackWatermarkPrintLastMillis = millis();
@@ -228,6 +305,13 @@ void Commands::PrintStackWatermark(){
 	}
 }
 
+/**
+ * @fn float ConvertToFloat(uint8_t*)
+ * @brief Convert four bytes from a pointer to a float value. The buffer must be at least 4 bytes.
+ *
+ * @param buffer	The pointer to the bytes
+ * @return float	The float value in the buffer
+ */
 float Commands::ConvertToFloat(uint8_t * buffer)
 {
 	float float_value = 0.0f;
@@ -235,6 +319,15 @@ float Commands::ConvertToFloat(uint8_t * buffer)
 	return float_value;
 }
 
+/**
+ * @fn uint8_t CalculateChecksum(uint8_t*, uint16_t)
+ * @brief Calculate the checksum from the bytes in the buffer. The checksum is the simple sum of all the bytes in the buffer.
+ * Only the low eight bits of sum is used for checksum.
+ *
+ * @param buffer	The pointer to the buffer
+ * @param len		Length of data in the buffer
+ * @return uint8_t	The calculated checksum
+ */
 uint8_t Commands::CalculateChecksum(uint8_t * buffer, uint16_t len)
 {
 	uint8_t checksum = 0;
@@ -245,6 +338,11 @@ uint8_t Commands::CalculateChecksum(uint8_t * buffer, uint16_t len)
 	return checksum;
 }
 
+/**
+ * @fn void SendBackCurrentPosition()
+ * @brief Get the current x and y values from motor controller and send it over UART port.
+ *
+ */
 void Commands::SendBackCurrentPosition()
 {
 	// Send back the current location

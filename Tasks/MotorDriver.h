@@ -102,6 +102,9 @@ private:
 
 	void					SetXTargetSpeedToMin(float x_cur);
 	void					SetYTargetSpeedToMin(float y_cur);
+
+	void 					SetXCurrentPosition(float x);
+	void 					SetYCurrentPosition(float y);
 };
 
 extern MotorDriver motorDriver;
